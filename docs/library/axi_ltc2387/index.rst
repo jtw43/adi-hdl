@@ -10,6 +10,11 @@ The :git-hdl:`AXI LTC2387 <library/axi_ltc2387>` IP core can be used to
 interface :adi:`LTC2387-18`, :adi:`LTC2386-18`, :adi:`LTC2385-18` and
 :adi:`ADAQ23878` devices.
 
+.. warning::
+
+   The 16-bit version of these chips is currently not supported by us, but with
+   minimal changes in the device tree, the user to do it.
+
 This documentation only covers the IP core and requires that one must be
 familiar with the device for a complete and better understanding.
 
@@ -77,11 +82,12 @@ the modules.
 * For the 18-bit, ADC_RES=18 (=> OUT_RES=32; addresses should be on a nb. of
   bits power of 2)
 * For the 16-bit, ADC_RES=16 (=> OUT_RES=16)
+  that's power of 2)
 
 .. warning::
 
    When using the ONE LANE configuration (TWOLANES=0), the only resolution
-   supported is 18 bits!
+   available is 18 bits!
 
 Detailed Description
 --------------------------------------------------------------------------------
