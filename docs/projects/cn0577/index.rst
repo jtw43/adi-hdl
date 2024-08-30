@@ -9,7 +9,7 @@ Overview
 The :adi:`CN0577` provides an analog front-end and an FMC
 digital interface for :adi:`LTC2387-18`, its core. It is a low noise, high
 speed successive approximation register (SAR) ADC with a resolution of 18 bits
-and sampling rate up to 15MSPS.
+and sampling rate up to 15 MSPS.
 
 :adi:`CN0577` includes an on-board reference oscillator and a
 retiming circuit to minimize signal-to-noise ratio (SNR) degradation due to the
@@ -24,12 +24,15 @@ Supported boards
 -------------------------------------------------------------------------------
 
 - :adi:`CN0577`
+- :adi:`EVAL-ADAQ23878`
 
 Supported devices
 -------------------------------------------------------------------------------
 
-- :adi:`ADAQ23876`
-- :adi:`LTC2387-18`
+- :adi:`LTC2387-18` 18-bit 15 MSPS
+- :adi:`LTC2386-18` 18-bit 10 MSPS
+- :adi:`LTC2385-18` 18-bit 5 MSPS
+- :adi:`ADAQ23878` 18-bit 15 MSPS
 
 Supported carriers
 -------------------------------------------------------------------------------
@@ -39,7 +42,8 @@ Supported carriers
 Block design
 -------------------------------------------------------------------------------
 
-.. warning::
+.. caution::
+
     The VADJ for the Zedboard must be set to 2.5V.
 
 Block diagram
@@ -78,10 +82,17 @@ one-bit-adc-dac, in software.
   - Shorting pins 1 and 2 → TESTPAT = 1, pattern testing is active
   - Shorting pins 2 and 3 → TESTPAT = 0, pattern testing is inactive
 
+<<<<<<< HEAD
 - P3 - configures TWOLANES parameter
 
   - Shorting pins 1 and 2 → TWOLANES = 1 (TWO LANES mode)
   - Shorting pins 2 and 3 → TWOLANES = 0 (ONE LANE mode)
+=======
+- P3 - configures TWOLANES
+
+  - Shorting pins 1 and 2 → TWOLANES = 1 (two-lane mode)
+  - Shorting pins 2 and 3 → TWOLANES = 0 (one-lane mode)
+>>>>>>> 338442d07 (docs/projects/cn0577: Add all supported devices to list)
 
 Clock scheme
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -93,6 +104,13 @@ Clock scheme
   It is further named as reference clock. This clock is gated and fed back to
   the device as the sampling clock, on which the data was sampled
 - The DMA runs on the ZynqPS clock FCLK_CLK0 which has a frequency of 100MHz
+<<<<<<< HEAD
+=======
+- The LVDS input clock `ref_clk` is used to clock the
+  :git-hdl:`library/axi_pwm_gen` (on `ext_clk` port),
+  the :git-hdl:`library/axi_ltc2387` and the FIFO writes from
+  the :git-hdl:`DMA <library/axi_dmac>`
+>>>>>>> 338442d07 (docs/projects/cn0577: Add all supported devices to list)
 
 CPU/Memory interconnects addresses
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -100,13 +118,13 @@ CPU/Memory interconnects addresses
 The addresses are dependent on the architecture of the FPGA, having an offset
 added to the base address from HDL (see more at :ref:`architecture cpu-intercon-addr`).
 
-==================== ===============
-Instance             Zynq/Microblaze
-==================== ===============
-axi_ltc2387          0x44A0_0000
-axi_ltc2387_dma      0x44A3_0000
-axi_pwm_gen          0x44A6_0000
-==================== ===============
+=============== ===============
+Instance        Zynq/Microblaze
+=============== ===============
+axi_ltc2387     0x44A0_0000
+axi_ltc2387_dma 0x44A3_0000
+axi_pwm_gen     0x44A6_0000
+=============== ===============
 
 GPIOs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -141,11 +159,11 @@ Interrupts
 
 Below are the Programmable Logic interrupts used in this project.
 
-================ === ========== ===========
-Instance name    HDL Linux Zynq Actual Zynq
-================ === ========== ===========
-axi_ltc2387_dma  13  57         89
-================ === ========== ===========
+=============== === ========== ===========
+Instance name   HDL Linux Zynq Actual Zynq
+=============== === ========== ===========
+axi_ltc2387_dma 13  57         89
+=============== === ========== ===========
 
 Building the HDL project
 -------------------------------------------------------------------------------
@@ -174,15 +192,26 @@ Resources
 Systems related
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+<<<<<<< HEAD
 - :dokuwiki:`[Wiki] EVAL-CN0577-FMCZ User Guide <resources/eval/user-guides/circuits-from-the-lab/cn0577>`
 - :dokuwiki:`[Wiki] CN0577 HDL Reference Design <resources/eval/user-guides/circuits-from-the-lab/cn0577/hdl>`
+=======
+- :dokuwiki:`EVAL-CN0577-FMCZ User Guide <resources/eval/user-guides/circuits-from-the-lab/cn0577>`
+- :dokuwiki:`ADAQ23875 User Guide <resources/eval/user-guide/adaq23875>`
+>>>>>>> 338442d07 (docs/projects/cn0577: Add all supported devices to list)
 
 Hardware related
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - Product datasheets:
 
+<<<<<<< HEAD
   - :adi:`LTC2387-18`
+=======
+  - :adi:`LTC2387-18` 15 MSPS
+  - :adi:`LTC2386-18` 10 MSPS
+  - :adi:`LTC2385-18` 5 MSPS
+>>>>>>> 338442d07 (docs/projects/cn0577: Add all supported devices to list)
 
 - `Circuit Note CN0577 <https://www.analog.com/media/en/reference-design-documentation/reference-designs/cn0577.pdf>`__
 
