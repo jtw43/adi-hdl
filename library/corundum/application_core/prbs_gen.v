@@ -60,7 +60,7 @@ module prbs_gen #(
    * 'h60 // PRBS7
    * 'h110 // PRBS9
    * 'h500 // PRBS11
-   * 'h1C80 // PRBS13
+   * 'h1B00 // PRBS13
    * 'h6000 // PRBS15
    * 'h80004 // PRBS20
    * 'h420000 // PRBS23

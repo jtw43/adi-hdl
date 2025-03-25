@@ -40,34 +40,43 @@
 module prbs_mon #(
 
   parameter DATA_WIDTH = 32,
-  parameter POLYNOMIAL_WIDTH = 31
+  parameter POLYNOMIAL_WIDTH = 31,
+  parameter BIT_ERRORS = 0,
+  parameter OUT_OF_SYNC_THRESHOLD = 16
 ) (
 
-  input  wire                        clk,
-  input  wire                        rstn,
+  input  wire                                         clk,
+  input  wire                                         rstn,
 
-  input  wire [DATA_WIDTH-1:0]       input_data,
-  input  wire                        input_valid,
-  output reg                         error,
+  input  wire [DATA_WIDTH-1:0]                        input_data,
+  input  wire                                         input_valid,
 
-  input  wire [POLYNOMIAL_WIDTH-1:0] polynomial,
-  input  wire                        inverted
+  output reg  [($clog2(DATA_WIDTH+1)-1)*BIT_ERRORS:0] error,
+  output reg                                          out_of_sync,
+
+  input  wire [POLYNOMIAL_WIDTH-1:0]                  polynomial,
+  input  wire                                         inverted
 );
+
+  initial begin
+    if (BIT_ERRORS != 0 && BIT_ERRORS != 1) begin
+      $error("BIT_ERRORS can only have a value of 0 or 1!");
+      $finish;
+    end
+  end
 
   /* Common polynomials:
    * 'h60 // PRBS7
    * 'h110 // PRBS9
    * 'h500 // PRBS11
-   * 'h1C80 // PRBS13
+   * 'h1B00 // PRBS13
    * 'h6000 // PRBS15
    * 'h80004 // PRBS20
    * 'h420000 // PRBS23
    * 'h48000000 // PRBS31
    */
 
-  reg state;  // 0 - Waiting for first value
-              // 1 - Running
-
+  // calculate the PRBS data based on the last input data
   reg  [DATA_WIDTH-1:0] internal_data;
   wire [DATA_WIDTH-1:0] calculated_prbs_data;
 
@@ -81,23 +90,114 @@ module prbs_mon #(
     .inverted(inverted)
   );
 
+  reg state;  // 0 - Waiting for first value
+              // 1 - Running
+
+  reg [$clog2(OUT_OF_SYNC_THRESHOLD)-1:0] oos_counter;
+
+  // check all bits if they are correct
+  localparam DATA_WIDTH_2 = 2**$clog2(DATA_WIDTH);
+
+  reg [DATA_WIDTH_2-1:0] bit_errors;
+
+  always @(posedge clk)
+  begin
+    if (!rstn) begin
+      bit_errors <= {DATA_WIDTH_2{1'b0}};
+    end else begin
+      if (!state) begin
+        bit_errors <= {DATA_WIDTH_2{1'b0}};
+      end else begin
+        bit_errors <= input_data ^ calculated_prbs_data;
+      end
+    end
+  end
+
+  // count the number of error bits
+  integer i, j;
+  integer new_block, last_block;
+
+  reg [($clog2(DATA_WIDTH+1)-1):0] bit_error_counter [DATA_WIDTH_2-2:0];
+
+  always @(posedge clk)
+  begin
+    if (!rstn) begin
+      for (i = 0; i < DATA_WIDTH_2-1; i = i + 1) begin
+        bit_error_counter[i] <= {$clog2(DATA_WIDTH+1){1'b0}};
+      end
+    end else begin
+      if (!state) begin
+        for (i = 0; i < DATA_WIDTH_2-1; i = i + 1) begin
+          bit_error_counter[i] <= {$clog2(DATA_WIDTH+1){1'b0}};
+        end
+      end else begin
+        if (input_valid) begin
+          for (j = 0; j < DATA_WIDTH_2/2; j = j + 1) begin
+            bit_error_counter[j] <= bit_errors[j*2] + bit_errors[j*2 + 1];
+          end
+          last_block = DATA_WIDTH_2/2;
+
+          for (i = 1; i < $clog2(DATA_WIDTH_2); i = i + 1) begin
+            new_block = DATA_WIDTH_2/(2**(i+1));
+            for (j = 0; j < new_block; j = j + 1) begin
+              bit_error_counter[last_block + j] <= bit_error_counter[last_block - j*2 - 1] + bit_error_counter[last_block - j*2 - 2];
+            end
+            last_block = last_block + new_block;
+          end
+        end
+      end
+    end
+  end
+
+  // check if there are errors in the PRBS sequence
   always @(posedge clk)
   begin
     if (!rstn) begin
       internal_data <= {DATA_WIDTH{1'b0}};
-      error <= 1'b0;
       state <= 1'b0;
+      out_of_sync <= 1'b0;
+      oos_counter <= {$clog2(OUT_OF_SYNC_THRESHOLD){1'b0}};
+      if(BIT_ERRORS == 0) begin
+        error <= 1'b0;
+      end else begin
+        error <= {$clog2(DATA_WIDTH+1){1'b0}};
+      end
     end else begin
+      out_of_sync <= 1'b0;
       if (input_valid) begin
         if (!state) begin
           state <= 1'b1;
           internal_data <= input_data;
+          error <= 1'b0;
         end else begin
           internal_data <= calculated_prbs_data;
-          if (input_data !== calculated_prbs_data) begin
-            error <= 1'b1;
+          if(BIT_ERRORS == 0) begin
+            if (input_data != calculated_prbs_data) begin
+              error <= 1'b1;
+              if (oos_counter == OUT_OF_SYNC_THRESHOLD-1) begin
+                oos_counter <= {$clog2(OUT_OF_SYNC_THRESHOLD){1'b0}};
+                state <= 1'b0;
+                out_of_sync <= 1'b1;
+              end else begin
+                oos_counter <= oos_counter + 1'b1;
+              end
+            end else begin
+              error <= 1'b0;
+              oos_counter <= {$clog2(OUT_OF_SYNC_THRESHOLD){1'b0}};
+            end
           end else begin
-            error <= 1'b0;
+            error <= bit_error_counter[DATA_WIDTH_2-2];
+            if (|bit_error_counter[DATA_WIDTH_2-2]) begin
+              if (oos_counter == OUT_OF_SYNC_THRESHOLD-1) begin
+                oos_counter <= {$clog2(OUT_OF_SYNC_THRESHOLD){1'b0}};
+                state <= 1'b0;
+                out_of_sync <= 1'b1;
+              end else begin
+                oos_counter <= oos_counter + 1'b1;
+              end
+            end else begin
+              oos_counter <= {$clog2(OUT_OF_SYNC_THRESHOLD){1'b0}};
+            end
           end
         end
       end
