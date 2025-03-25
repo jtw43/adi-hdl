@@ -128,7 +128,7 @@ begin
     // Data generator
     start_app <= 1'b0;
     // Packetizer
-    packet_size <= 8'd4;
+    packet_size <= 16'd1024;
     // Ethernet header
     ethernet_destination_MAC <= 48'hB83FD22A0BF1;
     ethernet_source_MAC <= 48'h000A35000102;
