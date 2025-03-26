@@ -46,6 +46,8 @@ module prbs_gen #(
   input  wire                        clk,
   input  wire                        rstn,
 
+  input  wire                        init,
+
   input  wire                        input_ready,
   output wire [DATA_WIDTH-1:0]       output_data,
   output reg                         output_valid,
@@ -86,11 +88,16 @@ module prbs_gen #(
       internal_data <= initial_value;
       output_valid <= 1'b0;
     end else begin
-      if (input_ready) begin
-        internal_data <= calculated_prbs_data;
-        output_valid <= 1'b1;
-      end else begin
+      if (init) begin
+        internal_data <= initial_value;
         output_valid <= 1'b0;
+      end else begin
+        if (input_ready) begin
+          internal_data <= calculated_prbs_data;
+          output_valid <= 1'b1;
+        end else begin
+          output_valid <= 1'b0;
+        end
       end
     end
   end
