@@ -550,6 +550,14 @@ module application_core #
       $error("Invalid APP_ID (expected 32'h12340001, got 32'h%x) (instance %m)", APP_ID);
       $finish;
     end
+    if (IF_COUNT != 1) begin
+      $error("Invalid IF_COUNT (expected 1, got %d) (instance %m)", IF_COUNT);
+      $finish;
+    end
+    if (PORTS_PER_IF != 1) begin
+      $error("Invalid PORTS_PER_IF (expected 1, got %d) (instance %m)", PORTS_PER_IF);
+      $finish;
+    end
   end
 
   wire rstn;
@@ -693,11 +701,57 @@ module application_core #
     .udp_destination(udp_destination),
     .udp_checksum(udp_checksum));
 
+  wire        ber_test;
+  wire [63:0] total_bits;
+  wire [63:0] error_bits_total;
+  wire [31:0] out_of_sync_total;
+
+  ber_tester #(
+    .IF_COUNT(IF_COUNT),
+    .PORTS_PER_IF(PORTS_PER_IF),
+    .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH),
+    .AXIS_KEEP_WIDTH(AXIS_KEEP_WIDTH),
+    .AXIS_TX_USER_WIDTH(AXIS_TX_USER_WIDTH),
+    .AXIS_RX_USER_WIDTH(AXIS_RX_USER_WIDTH)
+  ) ber_tester_inst (
+    .ber_test(ber_test),
+    .total_bits(total_bits),
+    .error_bits_total(error_bits_total),
+    .out_of_sync_total(out_of_sync_total),
+    .direct_tx_clk(direct_tx_clk),
+    .direct_tx_rst(direct_tx_rst),
+    .s_axis_direct_tx_tdata(s_axis_direct_tx_tdata),
+    .s_axis_direct_tx_tkeep(s_axis_direct_tx_tkeep),
+    .s_axis_direct_tx_tvalid(s_axis_direct_tx_tvalid),
+    .s_axis_direct_tx_tready(s_axis_direct_tx_tready),
+    .s_axis_direct_tx_tlast(s_axis_direct_tx_tlast),
+    .s_axis_direct_tx_tuser(s_axis_direct_tx_tuser),
+    .m_axis_direct_tx_tdata(m_axis_direct_tx_tdata),
+    .m_axis_direct_tx_tkeep(m_axis_direct_tx_tkeep),
+    .m_axis_direct_tx_tvalid(m_axis_direct_tx_tvalid),
+    .m_axis_direct_tx_tready(m_axis_direct_tx_tready),
+    .m_axis_direct_tx_tlast(m_axis_direct_tx_tlast),
+    .m_axis_direct_tx_tuser(m_axis_direct_tx_tuser),
+    .direct_rx_clk(direct_rx_clk),
+    .direct_rx_rst(direct_rx_rst),
+    .s_axis_direct_rx_tdata(s_axis_direct_rx_tdata),
+    .s_axis_direct_rx_tkeep(s_axis_direct_rx_tkeep),
+    .s_axis_direct_rx_tvalid(s_axis_direct_rx_tvalid),
+    .s_axis_direct_rx_tready(s_axis_direct_rx_tready),
+    .s_axis_direct_rx_tlast(s_axis_direct_rx_tlast),
+    .s_axis_direct_rx_tuser(s_axis_direct_rx_tuser),
+    .m_axis_direct_rx_tdata(m_axis_direct_rx_tdata),
+    .m_axis_direct_rx_tkeep(m_axis_direct_rx_tkeep),
+    .m_axis_direct_rx_tvalid(m_axis_direct_rx_tvalid),
+    .m_axis_direct_rx_tready(m_axis_direct_rx_tready),
+    .m_axis_direct_rx_tlast(m_axis_direct_rx_tlast),
+    .m_axis_direct_rx_tuser(m_axis_direct_rx_tuser)
+  );
+
   ////----------------------------------------AXI Interface-----------------//
   //////////////////////////////////////////////////
 
   wire                            start_counter_reg;
-  wire                            stop_counter_reg;
   wire                            clear_counter_reg;
   reg  [31:0]                     counter_reg;
 
@@ -731,7 +785,6 @@ module application_core #
 
     .start_app(start_app),
     .start_counter_reg(start_counter_reg),
-    .stop_counter_reg(stop_counter_reg),
     .clear_counter_reg(clear_counter_reg),
     .counter_reg(counter_reg),
     .packet_size(packet_size),
@@ -754,7 +807,12 @@ module application_core #
     .udp_source(udp_source),
     .udp_destination(udp_destination),
     .udp_length(udp_length),
-    .udp_checksum(udp_checksum));
+    .udp_checksum(udp_checksum),
+
+    .ber_test(ber_test),
+    .total_bits(total_bits),
+    .error_bits_total(error_bits_total),
+    .out_of_sync_total(out_of_sync_total));
 
   ////----------------------------------------Others-----------------//
   //////////////////////////////////////////////////
@@ -837,24 +895,24 @@ module application_core #
   assign data_dma_ram_rd_resp_valid = data_dma_ram_rd_cmd_valid;
 
   // Ethernet (direct MAC interface - lowest latency raw traffic)
-  assign m_axis_direct_tx_tdata = s_axis_direct_tx_tdata;
-  assign m_axis_direct_tx_tkeep = s_axis_direct_tx_tkeep;
-  assign m_axis_direct_tx_tvalid = s_axis_direct_tx_tvalid;
-  assign s_axis_direct_tx_tready = m_axis_direct_tx_tready;
-  assign m_axis_direct_tx_tlast = s_axis_direct_tx_tlast;
-  assign m_axis_direct_tx_tuser = s_axis_direct_tx_tuser;
+  // assign m_axis_direct_tx_tdata = s_axis_direct_tx_tdata;
+  // assign m_axis_direct_tx_tkeep = s_axis_direct_tx_tkeep;
+  // assign m_axis_direct_tx_tvalid = s_axis_direct_tx_tvalid;
+  // assign s_axis_direct_tx_tready = m_axis_direct_tx_tready;
+  // assign m_axis_direct_tx_tlast = s_axis_direct_tx_tlast;
+  // assign m_axis_direct_tx_tuser = s_axis_direct_tx_tuser;
 
   assign m_axis_direct_tx_cpl_ts = s_axis_direct_tx_cpl_ts;
   assign m_axis_direct_tx_cpl_tag = s_axis_direct_tx_cpl_tag;
   assign m_axis_direct_tx_cpl_valid = s_axis_direct_tx_cpl_valid;
   assign s_axis_direct_tx_cpl_ready = m_axis_direct_tx_cpl_ready;
 
-  assign m_axis_direct_rx_tdata = s_axis_direct_rx_tdata;
-  assign m_axis_direct_rx_tkeep = s_axis_direct_rx_tkeep;
-  assign m_axis_direct_rx_tvalid = s_axis_direct_rx_tvalid;
-  assign s_axis_direct_rx_tready = m_axis_direct_rx_tready;
-  assign m_axis_direct_rx_tlast = s_axis_direct_rx_tlast;
-  assign m_axis_direct_rx_tuser = s_axis_direct_rx_tuser;
+  // assign m_axis_direct_rx_tdata = s_axis_direct_rx_tdata;
+  // assign m_axis_direct_rx_tkeep = s_axis_direct_rx_tkeep;
+  // assign m_axis_direct_rx_tvalid = s_axis_direct_rx_tvalid;
+  // assign s_axis_direct_rx_tready = m_axis_direct_rx_tready;
+  // assign m_axis_direct_rx_tlast = s_axis_direct_rx_tlast;
+  // assign m_axis_direct_rx_tuser = s_axis_direct_rx_tuser;
 
   // Ethernet (synchronous MAC interface - low latency raw traffic)
   assign m_axis_sync_tx_cpl_ts = s_axis_sync_tx_cpl_ts;

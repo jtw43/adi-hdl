@@ -40,14 +40,15 @@
 module prbs #(
 
   parameter DATA_WIDTH = 32,
-  parameter POLYNOMIAL_WIDTH = 31
+  parameter POLYNOMIAL_WIDTH = 32
 ) (
 
-  input  wire [DATA_WIDTH-1:0] input_data,
-  output reg  [DATA_WIDTH-1:0] output_data,
-
+  input  wire [POLYNOMIAL_WIDTH-1:0] input_data,
   input  wire [POLYNOMIAL_WIDTH-1:0] polynomial,
-  input  wire                        inverted
+  input  wire                        inverted,
+
+  output reg  [POLYNOMIAL_WIDTH-1:0] state,
+  output reg  [DATA_WIDTH-1:0]       output_data
 );
 
   /* Common polynomials:
@@ -61,25 +62,35 @@ module prbs #(
    * 'h48000000 // PRBS31
    */
 
-  localparam MAX_WIDTH = (DATA_WIDTH > POLYNOMIAL_WIDTH) ? DATA_WIDTH : POLYNOMIAL_WIDTH;
+  // check configuration
+   initial begin
+    if (DATA_WIDTH < POLYNOMIAL_WIDTH) begin
+      $error("Data width: %0d < Polynomial width: %0d (instance %m)", DATA_WIDTH, POLYNOMIAL_WIDTH);
+      $finish;
+    end
+  end
 
-  reg [DATA_WIDTH*POLYNOMIAL_WIDTH-1:0] internal_data;
+  reg [(DATA_WIDTH+1)*POLYNOMIAL_WIDTH-1:0] internal_data;
 
   integer i;
 
+  // PRBS calculations
   always @(*)
   begin
-    internal_data[POLYNOMIAL_WIDTH-1:0] = {{MAX_WIDTH-DATA_WIDTH{1'b0}}, input_data};
+    internal_data[POLYNOMIAL_WIDTH-1:0] = input_data;
 
-    for (i = 1; i < DATA_WIDTH; i = i + 1) begin
+    for (i = 1; i <= DATA_WIDTH; i = i + 1) begin
       internal_data[POLYNOMIAL_WIDTH*i +: POLYNOMIAL_WIDTH] = {internal_data[POLYNOMIAL_WIDTH*(i-1) +: POLYNOMIAL_WIDTH-1], ^(polynomial & internal_data[POLYNOMIAL_WIDTH*(i-1) +: POLYNOMIAL_WIDTH]) ^ inverted};
     end
   end
 
+  // Sequence and current state output
   always @(*)
   begin
+    state = internal_data[DATA_WIDTH*POLYNOMIAL_WIDTH +: POLYNOMIAL_WIDTH];
+
     for (i = 0; i < DATA_WIDTH; i = i + 1) begin
-      output_data[i] = internal_data[(DATA_WIDTH-i)*POLYNOMIAL_WIDTH-1];
+      output_data[i] = internal_data[(DATA_WIDTH-i)*POLYNOMIAL_WIDTH];
     end
   end
 

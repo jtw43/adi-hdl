@@ -69,7 +69,6 @@ module application_regmap #(
 
   output reg                             start_app,
   output reg                             start_counter_reg,
-  output reg                             stop_counter_reg,
   output reg                             clear_counter_reg,
   input  wire [31:0]                     counter_reg,
   output reg  [15:0]                     packet_size,
@@ -97,7 +96,13 @@ module application_regmap #(
   output reg  [16-1:0]                   udp_source,
   output reg  [16-1:0]                   udp_destination,
   input  wire [16-1:0]                   udp_length,
-  output reg  [16-1:0]                   udp_checksum
+  output reg  [16-1:0]                   udp_checksum,
+
+  output reg                             ber_test,
+
+  input  wire [63:0]                     total_bits,
+  input  wire [63:0]                     error_bits_total,
+  input  wire [31:0]                     out_of_sync_total
 );
 
 wire                              up_wreq;
@@ -123,7 +128,6 @@ begin
     // Generic
     scratch_reg <= 'h0;
     start_counter_reg <= 1'b0;
-    stop_counter_reg <= 1'b0;
     clear_counter_reg <= 1'b0;
     // Data generator
     start_app <= 1'b0;
@@ -148,6 +152,8 @@ begin
     udp_source <= 16'h1234;
     udp_destination <= 16'h5678;
     udp_checksum <= 16'h0000;
+    // BER testing
+    ber_test <= 1'b0;
   end else begin
     up_wack <= up_wreq;
     up_rack <= up_rreq;
@@ -156,10 +162,7 @@ begin
       case (up_waddr)
         // Generic
         'h1: scratch_reg <= up_wdata;
-        'h2: begin
-          start_counter_reg <= up_wdata[0];
-          stop_counter_reg <= up_wdata[1];
-        end
+        'h2: start_counter_reg <= up_wdata[0];
         'h3: clear_counter_reg <= up_wdata[0];
         // Data generator
         'h5: start_app <= up_wdata[0];
@@ -186,6 +189,8 @@ begin
         'h18: udp_source <= up_wdata[16-1:0];
         'h19: udp_destination <= up_wdata[16-1:0];
         'h1B: udp_checksum <= up_wdata[16-1:0];
+        // BER testing
+        'h1C: ber_test <= up_wdata[0];
         default: ;
       endcase
     end else begin
@@ -197,7 +202,7 @@ begin
         // Generic
         'h0: up_rdata <= version_reg;
         'h1: up_rdata <= scratch_reg;
-        'h2: up_rdata <= {{30{1'b0}}, stop_counter_reg, start_counter_reg};
+        'h2: up_rdata <= {{31{1'b0}}, start_counter_reg};
         'h3: up_rdata <= {{31{1'b0}}, clear_counter_reg};
         'h4: up_rdata <= counter_reg;
         // Data generator
@@ -228,6 +233,13 @@ begin
         'h19: up_rdata <= {{16{1'b0}}, udp_destination};
         'h1A: up_rdata <= {{16{1'b0}}, udp_length};
         'h1B: up_rdata <= {{16{1'b0}}, udp_checksum};
+        // BER testing
+        'h1C: up_rdata <= {{31{1'b0}}, ber_test};
+        'h1D: up_rdata <= total_bits[63:32];
+        'h1E: up_rdata <= total_bits[31:0];
+        'h1F: up_rdata <= error_bits_total[63:32];
+        'h20: up_rdata <= error_bits_total[31:0];
+        'h21: up_rdata <= {{31{1'b0}}, out_of_sync_total};
         default: up_rdata <= 32'd0;
       endcase
     end else begin

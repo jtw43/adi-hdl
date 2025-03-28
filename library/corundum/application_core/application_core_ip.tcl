@@ -18,6 +18,12 @@ adi_ip_files application_core [list \
   "rx_arbiter.v" \
   "header_inserter.v" \
   "packetizer.v" \
+  "prbs.v" \
+  "prbs_gen.v" \
+  "prbs_mon.v" \
+  "ber_tester_tx.v" \
+  "ber_tester_rx.v" \
+  "ber_tester.v" \
   "application_regmap.v" \
   "macro_definitions.vh" \
   "$ad_hdl_dir/library/common/up_axi.v" \

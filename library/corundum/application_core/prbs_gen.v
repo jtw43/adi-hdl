@@ -40,7 +40,7 @@
 module prbs_gen #(
 
   parameter DATA_WIDTH = 32,
-  parameter POLYNOMIAL_WIDTH = 31
+  parameter POLYNOMIAL_WIDTH = 32
 ) (
 
   input  wire                        clk,
@@ -59,41 +59,51 @@ module prbs_gen #(
 );
 
   /* Common polynomials:
-   * 'h60 // PRBS7
-   * 'h110 // PRBS9
-   * 'h500 // PRBS11
-   * 'h1B00 // PRBS13
-   * 'h6000 // PRBS15
-   * 'h80004 // PRBS20
-   * 'h420000 // PRBS23
-   * 'h48000000 // PRBS31
+   * 7'h60 // PRBS7
+   * 9'h110 // PRBS9
+   * 11'h500 // PRBS11
+   * 13'h1B00 // PRBS13
+   * 15'h6000 // PRBS15
+   * 20'h80004 // PRBS20
+   * 23'h420000 // PRBS23
+   * 31'h48000000 // PRBS31
+   * 48'hC00000000000 // PRBS48
    */
 
-  reg  [DATA_WIDTH-1:0] internal_data;
-  wire [DATA_WIDTH-1:0] calculated_prbs_data;
+  localparam MAX_WIDTH = (DATA_WIDTH > POLYNOMIAL_WIDTH) ? DATA_WIDTH : POLYNOMIAL_WIDTH;
+
+  reg  [DATA_WIDTH-1:0]       internal_data;
+  wire [DATA_WIDTH-1:0]       calculated_prbs_data;
+
+  reg  [POLYNOMIAL_WIDTH-1:0] internal_state;
+  wire [POLYNOMIAL_WIDTH-1:0] polynomial_state;
 
   prbs #(
     .DATA_WIDTH(DATA_WIDTH),
     .POLYNOMIAL_WIDTH(POLYNOMIAL_WIDTH)
   ) prbs_inst (
-    .input_data(internal_data),
-    .output_data(calculated_prbs_data),
+    .input_data(internal_state),
     .polynomial(polynomial),
-    .inverted(inverted)
+    .inverted(inverted),
+    .state(polynomial_state),
+    .output_data(calculated_prbs_data)
   );
 
   always @(posedge clk)
   begin
     if (!rstn) begin
       internal_data <= initial_value;
+      internal_state <= {{MAX_WIDTH-DATA_WIDTH{1'b0}}, initial_value};
       output_valid <= 1'b0;
     end else begin
       if (init) begin
         internal_data <= initial_value;
+        internal_state <= {{MAX_WIDTH-DATA_WIDTH{1'b0}}, initial_value};
         output_valid <= 1'b0;
       end else begin
         if (input_ready) begin
           internal_data <= calculated_prbs_data;
+          internal_state <= polynomial_state;
           output_valid <= 1'b1;
         end else begin
           output_valid <= 1'b0;
