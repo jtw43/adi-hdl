@@ -99,6 +99,8 @@ module application_regmap #(
   output reg  [16-1:0]                   udp_checksum,
 
   output reg                             ber_test,
+  output reg                             reset_ber,
+  output reg                             insert_bit_error,
 
   input  wire [63:0]                     total_bits,
   input  wire [63:0]                     error_bits_total,
@@ -154,6 +156,8 @@ begin
     udp_checksum <= 16'h0000;
     // BER testing
     ber_test <= 1'b0;
+    reset_ber <= 1'b0;
+    insert_bit_error <= 1'b0;
   end else begin
     up_wack <= up_wreq;
     up_rack <= up_rreq;
@@ -191,10 +195,13 @@ begin
         'h1B: udp_checksum <= up_wdata[16-1:0];
         // BER testing
         'h1C: ber_test <= up_wdata[0];
+        'h1D: reset_ber <= up_wdata[0];
+        'h23: insert_bit_error <= up_wdata[0];
         default: ;
       endcase
     end else begin
       clear_counter_reg <= 1'b0;
+      reset_ber <= 1'b0;
     end
 
     if (up_rreq == 1'b1) begin
@@ -235,11 +242,13 @@ begin
         'h1B: up_rdata <= {{16{1'b0}}, udp_checksum};
         // BER testing
         'h1C: up_rdata <= {{31{1'b0}}, ber_test};
-        'h1D: up_rdata <= total_bits[63:32];
-        'h1E: up_rdata <= total_bits[31:0];
-        'h1F: up_rdata <= error_bits_total[63:32];
-        'h20: up_rdata <= error_bits_total[31:0];
-        'h21: up_rdata <= {{31{1'b0}}, out_of_sync_total};
+        'h1D: up_rdata <= {{31{1'b0}}, reset_ber};
+        'h1E: up_rdata <= total_bits[63:32];
+        'h1F: up_rdata <= total_bits[31:0];
+        'h20: up_rdata <= error_bits_total[63:32];
+        'h21: up_rdata <= error_bits_total[31:0];
+        'h22: up_rdata <= out_of_sync_total;
+        'h23: up_rdata <= {{31{1'b0}}, insert_bit_error};
         default: up_rdata <= 32'd0;
       endcase
     end else begin

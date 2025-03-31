@@ -62,14 +62,6 @@ module prbs #(
    * 'h48000000 // PRBS31
    */
 
-  // check configuration
-   initial begin
-    if (DATA_WIDTH < POLYNOMIAL_WIDTH) begin
-      $error("Data width: %0d < Polynomial width: %0d (instance %m)", DATA_WIDTH, POLYNOMIAL_WIDTH);
-      $finish;
-    end
-  end
-
   reg [(DATA_WIDTH+1)*POLYNOMIAL_WIDTH-1:0] internal_data;
 
   integer i;

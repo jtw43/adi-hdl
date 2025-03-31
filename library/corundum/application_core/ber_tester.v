@@ -51,6 +51,8 @@ module ber_tester #(
 ) (
 
   input  wire                                                      ber_test,
+  input  wire                                                      reset_ber,
+  input  wire                                                      insert_bit_error,
 
   output wire [63:0]                                               total_bits,
   output wire [63:0]                                               error_bits_total,
@@ -100,6 +102,7 @@ module ber_tester #(
     .AXIS_TX_USER_WIDTH(AXIS_TX_USER_WIDTH)
   ) ber_tester_tx_inst (
     .ber_test(ber_test),
+    .insert_bit_error(insert_bit_error),
     .direct_tx_clk(direct_tx_clk),
     .direct_tx_rst(direct_tx_rst),
     .s_axis_direct_tx_tdata(s_axis_direct_tx_tdata),
@@ -124,6 +127,7 @@ module ber_tester #(
     .AXIS_RX_USER_WIDTH(AXIS_RX_USER_WIDTH)
   ) ber_tester_rx_inst (
     .ber_test(ber_test),
+    .reset_ber(reset_ber),
     .total_bits(total_bits),
     .error_bits_total(error_bits_total),
     .out_of_sync_total(out_of_sync_total),

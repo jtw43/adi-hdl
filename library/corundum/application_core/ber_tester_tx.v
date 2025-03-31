@@ -50,6 +50,7 @@ module ber_tester_tx #(
 ) (
 
   input  wire                                                      ber_test,
+  input  wire                                                      insert_bit_error,
 
   // Ethernet (direct MAC interface - lowest latency raw traffic)
   input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          direct_tx_clk,
@@ -71,9 +72,11 @@ module ber_tester_tx #(
 );
 
   wire direct_tx_rstn;
-  wire ber_test_cdc;
 
   assign direct_tx_rstn = ~direct_tx_rst;
+
+  // ber_test CDC
+  wire ber_test_cdc;
 
   sync_bits #(
     .NUM_OF_BITS(1)
@@ -102,6 +105,7 @@ module ber_tester_tx #(
     end
   end
 
+  // PRBS instances
   reg prbs_ready;
 
   localparam PRBS_DATA_WIDTH = 64;
@@ -136,6 +140,59 @@ module ber_tester_tx #(
 
   endgenerate
 
+  // insert_bit_error CDC
+  wire insert_bit_error_cdc;
+
+  sync_bits #(
+    .NUM_OF_BITS(1)
+  ) sync_bits_insert_bit_error (
+    .in_bits(insert_bit_error),
+    .out_resetn(direct_tx_rstn),
+    .out_clk(direct_tx_clk),
+    .out_bits(insert_bit_error_cdc)
+  );
+
+  reg insert_bit_error_cdc_old;
+  reg insert_bit_error_valid;
+
+  always @(posedge direct_tx_clk)
+  begin
+    if (!direct_tx_rstn) begin
+      insert_bit_error_cdc_old <= 1'b0;
+      insert_bit_error_valid <= 1'b0;
+    end else begin
+      insert_bit_error_cdc_old <= insert_bit_error_cdc;
+      if (!insert_bit_error_cdc_old && insert_bit_error_cdc) begin
+        insert_bit_error_valid <= 1'b1;
+      end else begin
+        insert_bit_error_valid <= 1'b0;
+      end
+    end
+  end
+
+  // insertion place randomization
+  wire [$clog2(IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH)-1:0] insertion_place;
+  wire insertion_valid;
+
+  wire [IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH-1:0] prbs_data_post;
+
+  prbs_gen #(
+    .DATA_WIDTH($clog2(IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH)),
+    .POLYNOMIAL_WIDTH(15)
+  ) insertion_place_prbs_inst (
+    .clk(direct_tx_clk),
+    .rstn(direct_tx_rstn),
+    .init(init_prbs),
+    .input_ready(insert_bit_error_valid),
+    .output_data(insertion_place),
+    .output_valid(insertion_valid),
+    .polynomial(15'h6000),
+    .inverted(1'b0),
+    .initial_value(15'h657A)
+  );
+
+  assign prbs_data_post = (insertion_valid) ? prbs_data^(1'b1 << insertion_place) : prbs_data;
+
   // Datapath switch
   reg datapath_switch; // 0 - OS
                        // 1 - BER
@@ -164,9 +221,9 @@ module ber_tester_tx #(
 
       s_axis_direct_tx_tready = m_axis_direct_tx_tready;
 
-      prbs_ready <= 1'b0;
+      prbs_ready = 1'b0;
     end else begin
-      m_axis_direct_tx_tdata = prbs_data;
+      m_axis_direct_tx_tdata = prbs_data_post;
       m_axis_direct_tx_tkeep = {IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH{1'b1}};
       m_axis_direct_tx_tvalid = prbs_valid[0];
       m_axis_direct_tx_tlast = 1'b1;

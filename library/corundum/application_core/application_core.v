@@ -702,6 +702,8 @@ module application_core #
     .udp_checksum(udp_checksum));
 
   wire        ber_test;
+  wire        reset_ber;
+  wire        insert_bit_error;
   wire [63:0] total_bits;
   wire [63:0] error_bits_total;
   wire [31:0] out_of_sync_total;
@@ -715,6 +717,8 @@ module application_core #
     .AXIS_RX_USER_WIDTH(AXIS_RX_USER_WIDTH)
   ) ber_tester_inst (
     .ber_test(ber_test),
+    .reset_ber(reset_ber),
+    .insert_bit_error(insert_bit_error),
     .total_bits(total_bits),
     .error_bits_total(error_bits_total),
     .out_of_sync_total(out_of_sync_total),
@@ -810,6 +814,8 @@ module application_core #
     .udp_checksum(udp_checksum),
 
     .ber_test(ber_test),
+    .reset_ber(reset_ber),
+    .insert_bit_error(insert_bit_error),
     .total_bits(total_bits),
     .error_bits_total(error_bits_total),
     .out_of_sync_total(out_of_sync_total));

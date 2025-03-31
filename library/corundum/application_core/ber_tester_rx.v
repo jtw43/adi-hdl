@@ -50,6 +50,7 @@ module ber_tester_rx #(
 ) (
 
   input  wire                                                      ber_test,
+  input  wire                                                      reset_ber,
 
   output reg  [63:0]                                               total_bits,
   output reg  [63:0]                                               error_bits_total,
@@ -110,8 +111,6 @@ module ber_tester_rx #(
     end
   end
 
-  reg prbs_ready;
-
   localparam PRBS_DATA_WIDTH = 64;
   localparam PRBS_POLYNOMIAL_WIDTH = 48;
   localparam PRBS_INST = DATA_WIDTH/PRBS_DATA_WIDTH;
@@ -119,8 +118,10 @@ module ber_tester_rx #(
 
   reg  [DATA_WIDTH-1:0]                                  prbs_data;
   reg                                                    prbs_valid;
+
   wire [PRBS_INST-1:0]                                   out_of_sync;
   reg  [$clog2(PRBS_INST+1)-1:0]                         out_of_sync_counter [DATA_WIDTH_2-2:0];
+
   wire [$clog2(PRBS_DATA_WIDTH+1)-1:0]                   error_bits [PRBS_INST-1:0];
   reg  [$clog2(PRBS_DATA_WIDTH+1)+$clog2(PRBS_INST)-1:0] bit_error_counter [DATA_WIDTH_2-2:0];
 
@@ -129,6 +130,14 @@ module ber_tester_rx #(
   generate
 
     for (i = 0; i < PRBS_INST; i = i + 1) begin
+
+      // check configuration
+      initial begin
+        if (PRBS_DATA_WIDTH < PRBS_POLYNOMIAL_WIDTH) begin
+          $error("Data width: %0d < Polynomial width: %0d (instance %m)", PRBS_DATA_WIDTH, PRBS_POLYNOMIAL_WIDTH);
+          $finish;
+        end
+      end
 
       prbs_mon #(
         .DATA_WIDTH(PRBS_DATA_WIDTH),
@@ -197,10 +206,16 @@ module ber_tester_rx #(
       out_of_sync_total <= {32{1'b0}};
       error_bits_total <= {64{1'b0}};
     end else begin
-      if (prbs_valid) begin
-        total_bits <= total_bits + DATA_WIDTH;
-        out_of_sync_total <= out_of_sync_total + out_of_sync_counter[DATA_WIDTH_2-2];
-        error_bits_total <= error_bits_total + bit_error_counter[DATA_WIDTH_2-2];
+      if (reset_ber) begin
+        total_bits <= {64{1'b0}};
+        out_of_sync_total <= {32{1'b0}};
+        error_bits_total <= {64{1'b0}};
+      end else begin
+        if (prbs_valid) begin
+          total_bits <= total_bits + DATA_WIDTH;
+          out_of_sync_total <= out_of_sync_total + out_of_sync_counter[DATA_WIDTH_2-2];
+          error_bits_total <= error_bits_total + bit_error_counter[DATA_WIDTH_2-2];
+        end
       end
     end
   end
