@@ -7,7 +7,6 @@ create_bd_cell -type hier corundum_hierarchy
 current_bd_instance /corundum_hierarchy
 
 create_bd_intf_pin -mode Slave -vlnv xilinx.com:interface:aximm_rtl:1.0 s_axil_corundum
-create_bd_intf_pin -mode Slave -vlnv xilinx.com:interface:aximm_rtl:1.0 s_axil_application
 
 create_bd_intf_pin -mode Master -vlnv xilinx.com:interface:aximm_rtl:1.0 m_axi
 
@@ -339,6 +338,8 @@ if {$APP_ENABLE == 1} {
     OUTPUT_WIDTH $OUTPUT_WIDTH \
     OUTPUT_CHANNELS $OUTPUT_CHANNELS \
   ]
+
+  create_bd_intf_pin -mode Slave -vlnv xilinx.com:interface:aximm_rtl:1.0 s_axil_application
 
   create_bd_pin -dir I -type clk input_clk
   create_bd_pin -dir I -type rst input_rstn
