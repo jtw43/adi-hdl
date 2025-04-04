@@ -116,6 +116,37 @@ wire [(AXIL_CTRL_ADDR_WIDTH-3):0] up_raddr;
 reg  [31:0]                       up_rdata;
 reg                               up_rack;
 
+wire [63:0] total_bits_cdc;
+wire [63:0] error_bits_total_cdc;
+wire [31:0] out_of_sync_total_cdc;
+
+sync_bits #(
+  .NUM_OF_BITS(64)
+) sync_bits_total_bits (
+  .in_bits(total_bits),
+  .out_resetn(rstn),
+  .out_clk(clk),
+  .out_bits(total_bits_cdc)
+);
+
+sync_bits #(
+  .NUM_OF_BITS(64)
+) sync_bits_error_bits_total (
+  .in_bits(error_bits_total),
+  .out_resetn(rstn),
+  .out_clk(clk),
+  .out_bits(error_bits_total_cdc)
+);
+
+sync_bits #(
+  .NUM_OF_BITS(32)
+) sync_bits_out_of_sync_total (
+  .in_bits(out_of_sync_total),
+  .out_resetn(rstn),
+  .out_clk(clk),
+  .out_bits(out_of_sync_total_cdc)
+);
+
 // Generic
 reg [31:0] version_reg = 'h1234ABCD;
 reg [31:0] scratch_reg;
@@ -243,11 +274,11 @@ begin
         // BER testing
         'h1C: up_rdata <= {{31{1'b0}}, ber_test};
         'h1D: up_rdata <= {{31{1'b0}}, reset_ber};
-        'h1E: up_rdata <= total_bits[63:32];
-        'h1F: up_rdata <= total_bits[31:0];
-        'h20: up_rdata <= error_bits_total[63:32];
-        'h21: up_rdata <= error_bits_total[31:0];
-        'h22: up_rdata <= out_of_sync_total;
+        'h1E: up_rdata <= total_bits_cdc[63:32];
+        'h1F: up_rdata <= total_bits_cdc[31:0];
+        'h20: up_rdata <= error_bits_total_cdc[63:32];
+        'h21: up_rdata <= error_bits_total_cdc[31:0];
+        'h22: up_rdata <= out_of_sync_total_cdc;
         'h23: up_rdata <= {{31{1'b0}}, insert_bit_error};
         default: up_rdata <= 32'd0;
       endcase

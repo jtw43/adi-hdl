@@ -507,7 +507,7 @@ module corundum_core #(
   `ifdef APP_CUSTOM_PORTS_ENABLE
     `APP_CUSTOM_PORTS_DECL
   `endif
-  
+
   /*
   * Statistics increment input
   */
@@ -575,8 +575,8 @@ generate if (APP_ENABLE && AXIS_IF_TX_ID_WIDTH_APP != TX_QUEUE_INDEX_WIDTH)
   $fatal(0, "AXIS_IF_TX_ID_WIDTH_APP != TX_QUEUE_INDEX_WIDTH");
 endgenerate
 
-generate if (APP_ENABLE && AXIS_IF_RX_ID_WIDTH_APP != PORTS_PER_IF > 1 ? $clog2(PORTS_PER_IF) : 1)
-  $fatal(0, "AXIS_IF_RX_ID_WIDTH_APP != PORTS_PER_IF > 1 ? $clog2(PORTS_PER_IF) : 1");
+generate if (APP_ENABLE && AXIS_IF_RX_ID_WIDTH_APP != ((PORTS_PER_IF > 1) ? $clog2(PORTS_PER_IF) : 1))
+  $fatal(0, "AXIS_IF_RX_ID_WIDTH_APP != ((PORTS_PER_IF > 1) ? $clog2(PORTS_PER_IF) : 1)");
 endgenerate
 
 generate if (APP_ENABLE && AXIS_IF_TX_DEST_WIDTH_APP != $clog2(PORTS_PER_IF)+4)
