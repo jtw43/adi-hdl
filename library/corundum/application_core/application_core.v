@@ -832,9 +832,9 @@ module application_core #
       timer <= 32'd0;
     end else begin
       if (start_counter_reg || timer != 32'd0) begin
+        timer <= timer + 1;
         if (m_axis_sync_tx_tvalid && m_axis_sync_tx_tready && m_axis_sync_tx_tlast) begin
           counter_reg <= counter_reg + 1'b1;
-          timer <= timer + 1;
         end
         if (timer == 32'd250000000) begin
           timer <= 32'd0;

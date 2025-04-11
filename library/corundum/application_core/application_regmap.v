@@ -231,6 +231,7 @@ begin
         default: ;
       endcase
     end else begin
+      start_counter_reg <= 1'b0;
       clear_counter_reg <= 1'b0;
       reset_ber <= 1'b0;
     end

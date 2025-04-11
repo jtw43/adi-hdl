@@ -109,37 +109,6 @@ module application_rx #(
 
   `HTOND(16)
 
-  ////----------------------------------------Data checking---------------//
-  //////////////////////////////////////////////////
-
-  // reg  [7:0]             gen_data;
-
-  // reg  [OUTPUT_WIDTH-1:0] output_axis_tdata;
-  // reg                    output_axis_tvalid;
-  // wire                   output_axis_tready;
-
-  // always @(posedge output_clk)
-  // begin
-  //   if (!output_rstn) begin
-  //     gen_data <= 8'd0;
-  //   end else begin
-  //     if (output_axis_tready) begin
-  //       gen_data <= gen_data + 1;
-  //     end
-  //   end
-  // end
-
-  // always @(posedge output_clk)
-  // begin
-  //   if (!output_rstn) begin
-  //     output_axis_tdata <= {OUTPUT_WIDTH{1'b0}};
-  //     output_axis_tvalid <= 1'b0;
-  //   end else begin
-  //     output_axis_tdata <= {OUTPUT_WIDTH/8{gen_data}};
-  //     output_axis_tvalid <= 1'b1;
-  //   end
-  // end
-
   ////----------------------------------------Arbiter-------------------------//
   //////////////////////////////////////////////////
 
@@ -264,8 +233,6 @@ module application_rx #(
         m_axis_sync_rx_tuser <= {IF_COUNT*PORTS_PER_IF*AXIS_RX_USER_WIDTH{1'b0}};
 
         if (valid) begin
-          axis_sync_rx_tready_reg <= {IF_COUNT*PORTS_PER_IF{1'b1}};
-
           input_axis_tdata_reg[0] <= {IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH{1'b0}};
           input_axis_tkeep_reg[0] <= {IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH{1'b0}};
           input_axis_tvalid_reg[0] <= {IF_COUNT*PORTS_PER_IF{1'b0}};
@@ -275,6 +242,8 @@ module application_rx #(
           input_axis_tvalid_reg[1] <= {IF_COUNT*PORTS_PER_IF{1'b0}};
 
           input_axis_tlast_reg <= {IF_COUNT*PORTS_PER_IF{1'b0}};
+
+          axis_sync_rx_tready_reg <= {IF_COUNT*PORTS_PER_IF{1'b1}};
         end else begin
           // header extraction
           input_axis_tdata_reg[0] <= reg_part1;

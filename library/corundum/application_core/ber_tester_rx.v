@@ -171,7 +171,7 @@ module ber_tester_rx #(
           bit_error_counter[j] <= {$clog2(PRBS_DATA_WIDTH+PRBS_INST+1){1'b0}};
         end
       end else begin
-        if (!init_prbs) begin
+        if (init_prbs) begin
           for (j = 0; j < DATA_WIDTH_2-1; j = j + 1) begin
             out_of_sync_counter[j] <= {$clog2(PRBS_INST+1){1'b0}};
             bit_error_counter[j] <= {$clog2(PRBS_DATA_WIDTH+PRBS_INST+1){1'b0}};

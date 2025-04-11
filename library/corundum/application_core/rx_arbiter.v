@@ -102,24 +102,11 @@ module rx_arbiter #(
 
   localparam HEADER_LENGTH = 336;
 
-  wire [HEADER_LENGTH-1:0]     header_src_dst;
-  wire [HEADER_LENGTH-1:0]     header_length_checksum;
-
-  reg state;
-
   reg  [CHANNELS-1:0] output_enable_old;
   reg                 output_enable_ff;
   wire                output_enable_ff_cdc;
   reg                 output_enable_ff_cdc2;
   reg  [CHANNELS-1:0] output_enable_cdc;
-
-  reg [32-1:0]                 ip_header_checksum_reg0;
-  reg [32-1:0]                 ip_header_checksum_reg1;
-
-  reg  [HEADER_LENGTH-1:0]     cdc_axis_tdata_reg;
-
-  reg                          new_packet;
-  reg                          tlast_sig;
 
   always @(posedge input_clk)
   begin
@@ -162,9 +149,12 @@ module rx_arbiter #(
     end
   end
 
-  reg  [16-1:0]                ip_total_length;
-  reg  [16-1:0]                ip_header_checksum;
-  reg  [16-1:0]                udp_length;
+  reg [32-1:0] ip_header_checksum_reg0;
+  reg [32-1:0] ip_header_checksum_reg1;
+
+  reg [16-1:0] ip_total_length;
+  reg [16-1:0] ip_header_checksum;
+  reg [16-1:0] udp_length;
 
   // udp total length calculation
   always @(posedge clk)
@@ -211,55 +201,78 @@ module rx_arbiter #(
     end
   end
 
-  // header concatenation
+  wire [HEADER_LENGTH-1:0] header_src_dst, header_src_dst_mask;
+  wire [HEADER_LENGTH-1:0] header_length_checksum, header_length_checksum_mask;
+
+  // header source-destination masks
   assign header_src_dst = {
-    htond_16(16'hxxxx),
-    htond_16(16'hxxxx),
+    htond_16({16{1'b0}}),
+    htond_16({16{1'b0}}),
     htond_16(udp_source),
     htond_16(udp_destination),
     htond_32(ip_source_IP_address),
     htond_32(ip_destination_IP_address),
-    htond_16(16'hxxxx),
-    htond_16(16'hxxxx),
-    htond_16(16'hxxxx),
-    htond_16(16'hxxxx),
-    htond_16(16'hxxxx),
-    htond_16(16'hxxxx),
-    htond_16(16'hxxxx),
+    htond_16({16{1'b0}}),
+    htond_16({16{1'b0}}),
+    htond_16({16{1'b0}}),
+    htond_16({16{1'b0}}),
+    htond_16({16{1'b0}}),
+    htond_16({16{1'b0}}),
+    htond_16({16{1'b0}}),
     htond_48(ethernet_destination_MAC),
     htond_48(ethernet_source_MAC)};
+  assign header_src_dst_mask = {
+    {16{1'b0}},
+    {16{1'b0}},
+    {16{1'b1}},
+    {16{1'b1}},
+    {32{1'b1}},
+    {32{1'b1}},
+    {16{1'b0}},
+    {16{1'b0}},
+    {16{1'b0}},
+    {16{1'b0}},
+    {16{1'b0}},
+    {16{1'b0}},
+    {16{1'b0}},
+    {48{1'b1}},
+    {48{1'b1}}};
+
+  // header length and checksum concatenation
   assign header_length_checksum = {
     htond_16(udp_checksum),
     htond_16(udp_length),
-    htond_16(16'hxxxx),
-    htond_16(16'hxxxx),
-    htond_32(32'hxxxxxxxx),
-    htond_32(32'hxxxxxxxx),
+    htond_16({16{1'b0}}),
+    htond_16({16{1'b0}}),
+    htond_32({32{1'b0}}),
+    htond_32({32{1'b0}}),
     htond_16(ip_header_checksum),
-    htond_16(16'hxxxx),
-    htond_16(16'hxxxx),
-    htond_16(16'hxxxx),
+    htond_16({16{1'b0}}),
+    htond_16({16{1'b0}}),
+    htond_16({16{1'b0}}),
     htond_16(ip_total_length),
-    htond_16(16'hxxxx),
-    htond_16(16'hxxxx),
-    htond_48(48'hxxxxxxxxxxxx),
-    htond_48(48'hxxxxxxxxxxxx)};
-  // assign header = {
-  //   htond_16(udp_checksum),
-  //   htond_16(udp_length),
-  //   htond_16(udp_source),
-  //   htond_16(udp_destination),
-  //   htond_32(ip_source_IP_address),
-  //   htond_32(ip_destination_IP_address),
-  //   htond_16(ip_header_checksum),
-  //   htond_16({ip_time_to_live, ip_protocol}),
-  //   htond_16({ip_flags, ip_fragment_offset}),
-  //   htond_16(ip_identification),
-  //   htond_16(ip_total_length),
-  //   htond_16({ip_version, ip_header_length, ip_type_of_service}),
-  //   htond_16(ethernet_type),
-  //   htond_48(ethernet_destination_MAC),
-  //   htond_48(ethernet_source_MAC)};
+    htond_16({16{1'b0}}),
+    htond_16({16{1'b0}}),
+    htond_48({48{1'b0}}),
+    htond_48({48{1'b0}})};
+  assign header_length_checksum_mask = {
+    {16{1'b1}},
+    {16{1'b1}},
+    {16{1'b0}},
+    {16{1'b0}},
+    {32{1'b0}},
+    {32{1'b0}},
+    {16{1'b1}},
+    {16{1'b0}},
+    {16{1'b0}},
+    {16{1'b0}},
+    {16{1'b1}},
+    {16{1'b0}},
+    {16{1'b0}},
+    {48{1'b0}},
+    {48{1'b0}}};
+
+  reg state;
 
   always @(posedge clk)
   begin
@@ -281,9 +294,9 @@ module rx_arbiter #(
       valid <= 1'b0;
     end else begin
       if (state == 1'b0 && input_axis_tvalid && input_axis_tready) begin
-        if (start_app && header_src_dst == input_axis_tdata[HEADER_LENGTH-1:0]) begin
+        if (start_app && header_src_dst == (header_src_dst_mask & input_axis_tdata[HEADER_LENGTH-1:0])) begin
           switch <= 1'b1;
-          if (start_app && header_length_checksum == input_axis_tdata[HEADER_LENGTH-1:0]) begin
+          if (start_app && header_length_checksum == (header_length_checksum_mask & input_axis_tdata[HEADER_LENGTH-1:0])) begin
             valid <= 1'b1;
           end else begin
             valid <= 1'b0;

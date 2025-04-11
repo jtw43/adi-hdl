@@ -108,37 +108,6 @@ module application_tx #(
   input  wire [16-1:0]                   udp_checksum
 );
 
-  ////----------------------------------------Data generation---------------//
-  //////////////////////////////////////////////////
-
-  // reg  [7:0]             gen_data;
-
-  // reg  [INPUT_WIDTH-1:0] input_axis_tdata;
-  // reg                    input_axis_tvalid;
-  // wire                   input_axis_tready;
-
-  // always @(posedge input_clk)
-  // begin
-  //   if (!input_rstn) begin
-  //     gen_data <= 8'd0;
-  //   end else begin
-  //     if (input_axis_tready) begin
-  //       gen_data <= gen_data + 1;
-  //     end
-  //   end
-  // end
-
-  // always @(posedge input_clk)
-  // begin
-  //   if (!input_rstn) begin
-  //     input_axis_tdata <= {INPUT_WIDTH{1'b0}};
-  //     input_axis_tvalid <= 1'b0;
-  //   end else begin
-  //     input_axis_tdata <= {INPUT_WIDTH/8{gen_data}};
-  //     input_axis_tvalid <= 1'b1;
-  //   end
-  // end
-
   ////----------------------------------------Start application---------------//
   //////////////////////////////////////////////////
 
@@ -286,17 +255,17 @@ module application_tx #(
   ////----------------------------------------Header Inserter---------------//
   //////////////////////////////////////////////////
 
-  wire                         packet_axis_tvalid;
-  wire                         packet_axis_tready;
-  wire [AXIS_DATA_WIDTH-1:0]   packet_axis_tdata;
-  wire [AXIS_DATA_WIDTH/8-1:0] packet_axis_tkeep;
-  wire                         packet_axis_tlast;
+  wire                       packet_axis_tready;
+  wire                       packet_axis_tvalid;
+  wire [AXIS_DATA_WIDTH-1:0] packet_axis_tdata;
+  wire [AXIS_KEEP_WIDTH-1:0] packet_axis_tkeep;
+  wire                       packet_axis_tlast;
 
-  reg                          packet_buffer_axis_tready;
-  wire                         packet_buffer_axis_tvalid;
-  wire [AXIS_DATA_WIDTH-1:0]   packet_buffer_axis_tdata;
-  wire                         packet_buffer_axis_tlast;
-  wire [AXIS_DATA_WIDTH/8-1:0] packet_buffer_axis_tkeep;
+  wire                       packet_buffer_axis_tvalid;
+  reg                        packet_buffer_axis_tready;
+  wire [AXIS_DATA_WIDTH-1:0] packet_buffer_axis_tdata;
+  wire [AXIS_KEEP_WIDTH-1:0] packet_buffer_axis_tkeep;
+  wire                       packet_buffer_axis_tlast;
 
   wire packet_sent;
 
@@ -390,12 +359,12 @@ module application_tx #(
   reg                           os_buffer_axis_tready;
   wire                          os_buffer_axis_tvalid;
   wire [AXIS_DATA_WIDTH-1:0]    os_buffer_axis_tdata;
+  wire [AXIS_KEEP_WIDTH-1:0]    os_buffer_axis_tkeep;
   wire                          os_buffer_axis_tlast;
-  wire [AXIS_DATA_WIDTH/8-1:0]  os_buffer_axis_tkeep;
   wire [AXIS_TX_USER_WIDTH-1:0] os_buffer_axis_tuser;
 
   util_axis_fifo #(
-    .DATA_WIDTH(AXIS_DATA_WIDTH/8*9 + AXIS_TX_USER_WIDTH),
+    .DATA_WIDTH(AXIS_DATA_WIDTH + AXIS_KEEP_WIDTH + AXIS_TX_USER_WIDTH),
     .ADDRESS_WIDTH($clog2(12288/AXIS_DATA_WIDTH)+1),
     .ASYNC_CLK(0),
     .M_AXIS_REGISTERED(1),
@@ -452,7 +421,7 @@ module application_tx #(
       m_axis_sync_tx_tvalid = os_buffer_axis_tvalid;
       os_buffer_axis_tready = m_axis_sync_tx_tready;
       m_axis_sync_tx_tlast = os_buffer_axis_tlast;
-      m_axis_sync_tx_tuser = s_axis_sync_tx_tuser;
+      m_axis_sync_tx_tuser = os_buffer_axis_tuser;
 
       packet_buffer_axis_tready = 1'b0;
     end else begin
