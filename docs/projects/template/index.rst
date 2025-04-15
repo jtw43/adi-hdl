@@ -545,6 +545,21 @@ Instance name    HDL Linux Zynq Actual Zynq Linux ZynqMP Actual ZynqMP S10SoC Li
    NOTE THAT FOR ULTRASCALE\+ DEVICES, THE PS I2C IS NOT SUPPORTED IN LINUX!!
    ALWAYS USE PL I2C FOR THESE DESIGNS!!
 
+Resource utilization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To see the resources utilization, please go to
+:ref:`projects resources-daq3-zc706`. A simplified version of that table can
+be found below.
+
+..
+  ADAPT THE PATH BELOW SUCH THAT IT POINTS TO THE index.rst from
+  hdl/docs/projects/index.rst
+
+.. literalinclude:: ../../projects/index.rst
+  :start-at: daq3_zc706
+  :end-before: resources-daq3-zcu102
+
 Building the HDL project
 -------------------------------------------------------------------------------
 
