@@ -69,7 +69,6 @@ module application_regmap #(
 
   output reg                             start_app,
   output reg                             start_counter_reg,
-  output reg                             clear_counter_reg,
   input  wire [31:0]                     counter_reg,
   output reg  [15:0]                     packet_size,
 
@@ -100,7 +99,7 @@ module application_regmap #(
 
   output reg                             ber_test,
   output reg                             reset_ber,
-  output reg                             insert_bit_error,
+  output wire                            insert_bit_error,
 
   input  wire [63:0]                     total_bits,
   input  wire [63:0]                     error_bits_total,
@@ -150,18 +149,19 @@ sync_bits #(
 // Generic
 reg [31:0] version_reg = 'h1234ABCD;
 reg [31:0] scratch_reg;
+reg [15:0] insert_bit_error_reg;
+
+assign insert_bit_error = insert_bit_error_reg[15];
 
 always @(posedge clk)
 begin
-  if (rstn == 1'b0)
-  begin
+  if (rstn == 1'b0) begin
     up_wack <= 1'b0;
     up_rack <= 1'b0;
 
     // Generic
     scratch_reg <= 'h0;
     start_counter_reg <= 1'b0;
-    clear_counter_reg <= 1'b0;
     // Data generator
     start_app <= 1'b0;
     // Packetizer
@@ -188,7 +188,7 @@ begin
     // BER testing
     ber_test <= 1'b0;
     reset_ber <= 1'b0;
-    insert_bit_error <= 1'b0;
+    insert_bit_error_reg <= {16{1'b0}};
   end else begin
     up_wack <= up_wreq;
     up_rack <= up_rreq;
@@ -198,7 +198,6 @@ begin
         // Generic
         'h1: scratch_reg <= up_wdata;
         'h2: start_counter_reg <= up_wdata[0];
-        'h3: clear_counter_reg <= up_wdata[0];
         // Data generator
         'h5: start_app <= up_wdata[0];
         // Packetizer
@@ -227,13 +226,13 @@ begin
         // BER testing
         'h1C: ber_test <= up_wdata[0];
         'h1D: reset_ber <= up_wdata[0];
-        'h23: insert_bit_error <= up_wdata[0];
+        'h23: insert_bit_error_reg <= {16{up_wdata[0]}};
         default: ;
       endcase
     end else begin
       start_counter_reg <= 1'b0;
-      clear_counter_reg <= 1'b0;
       reset_ber <= 1'b0;
+      insert_bit_error_reg <= {insert_bit_error_reg[14:0], 1'b0};
     end
 
     if (up_rreq == 1'b1) begin
@@ -242,7 +241,6 @@ begin
         'h0: up_rdata <= version_reg;
         'h1: up_rdata <= scratch_reg;
         'h2: up_rdata <= {{31{1'b0}}, start_counter_reg};
-        'h3: up_rdata <= {{31{1'b0}}, clear_counter_reg};
         'h4: up_rdata <= counter_reg;
         // Data generator
         'h5: up_rdata <= {{31{1'b0}}, start_app};
@@ -280,7 +278,7 @@ begin
         'h20: up_rdata <= error_bits_total_cdc[63:32];
         'h21: up_rdata <= error_bits_total_cdc[31:0];
         'h22: up_rdata <= out_of_sync_total_cdc;
-        'h23: up_rdata <= {{31{1'b0}}, insert_bit_error};
+        'h23: up_rdata <= {{31{1'b0}}, insert_bit_error_reg[0]};
         default: up_rdata <= 32'd0;
       endcase
     end else begin

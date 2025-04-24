@@ -87,24 +87,6 @@ module ber_tester_tx #(
     .out_bits(ber_test_cdc)
   );
 
-  reg ber_test_cdc_old;
-  reg init_prbs;
-
-  always @(posedge direct_tx_clk)
-  begin
-    if (!direct_tx_rstn) begin
-      ber_test_cdc_old <= 1'b0;
-      init_prbs <= 1'b0;
-    end else begin
-      ber_test_cdc_old <= ber_test_cdc;
-      if (!ber_test_cdc_old && ber_test_cdc) begin
-        init_prbs <= 1'b1;
-      end else begin
-        init_prbs <= 1'b0;
-      end
-    end
-  end
-
   // PRBS instances
   reg prbs_ready;
 
@@ -127,7 +109,7 @@ module ber_tester_tx #(
       ) prbs_gen_inst (
         .clk(direct_tx_clk),
         .rstn(direct_tx_rstn),
-        .init(init_prbs),
+        .init(~ber_test_cdc),
         .input_ready(prbs_ready),
         .output_data(prbs_data[i*PRBS_DATA_WIDTH +: PRBS_DATA_WIDTH]),
         .output_valid(prbs_valid[i]),
@@ -165,14 +147,15 @@ module ber_tester_tx #(
       if (!insert_bit_error_cdc_old && insert_bit_error_cdc) begin
         insert_bit_error_valid <= 1'b1;
       end else begin
-        insert_bit_error_valid <= 1'b0;
+        if (prbs_ready && prbs_valid[0]) begin
+          insert_bit_error_valid <= 1'b0;
+        end
       end
     end
   end
 
   // insertion place randomization
   wire [$clog2(IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH)-1:0] insertion_place;
-  wire insertion_valid;
 
   wire [IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH-1:0] prbs_data_post;
 
@@ -182,16 +165,16 @@ module ber_tester_tx #(
   ) insertion_place_prbs_inst (
     .clk(direct_tx_clk),
     .rstn(direct_tx_rstn),
-    .init(init_prbs),
+    .init(~ber_test_cdc),
     .input_ready(insert_bit_error_valid),
     .output_data(insertion_place),
-    .output_valid(insertion_valid),
+    .output_valid(),
     .polynomial(15'h6000),
     .inverted(1'b0),
     .initial_value(15'h657A)
   );
 
-  assign prbs_data_post = (insertion_valid) ? prbs_data^(1'b1 << insertion_place) : prbs_data;
+  assign prbs_data_post = (insert_bit_error_valid) ? prbs_data^(1'b1 << insertion_place) : prbs_data;
 
   // Datapath switch
   reg datapath_switch; // 0 - OS

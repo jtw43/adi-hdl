@@ -105,8 +105,6 @@ module prbs_gen #(
           internal_data <= calculated_prbs_data;
           internal_state <= polynomial_state;
           output_valid <= 1'b1;
-        end else begin
-          output_valid <= 1'b0;
         end
       end
     end

@@ -756,7 +756,6 @@ module application_core #
   //////////////////////////////////////////////////
 
   wire                            start_counter_reg;
-  wire                            clear_counter_reg;
   reg  [31:0]                     counter_reg;
 
   application_regmap #(
@@ -789,7 +788,6 @@ module application_core #
 
     .start_app(start_app),
     .start_counter_reg(start_counter_reg),
-    .clear_counter_reg(clear_counter_reg),
     .counter_reg(counter_reg),
     .packet_size(packet_size),
 
@@ -827,17 +825,29 @@ module application_core #
   reg [31:0] timer;
 
   always @(posedge clk) begin
-    if (rst || clear_counter_reg) begin
-      counter_reg <= 32'd0;
+    if (rst) begin
       timer <= 32'd0;
     end else begin
       if (start_counter_reg || timer != 32'd0) begin
         timer <= timer + 1;
-        if (m_axis_sync_tx_tvalid && m_axis_sync_tx_tready && m_axis_sync_tx_tlast) begin
-          counter_reg <= counter_reg + 1'b1;
-        end
         if (timer == 32'd250000000) begin
           timer <= 32'd0;
+        end
+      end
+    end
+  end
+
+  always @(posedge clk) begin
+    if (rst) begin
+      counter_reg <= 32'd0;
+    end else begin
+      if (start_counter_reg) begin
+        counter_reg <= 32'd0;
+      end else begin
+        if (timer != 32'd0) begin
+          if (m_axis_sync_tx_tvalid && m_axis_sync_tx_tready && m_axis_sync_tx_tlast) begin
+            counter_reg <= counter_reg + 1'b1;
+          end
         end
       end
     end
@@ -901,24 +911,10 @@ module application_core #
   assign data_dma_ram_rd_resp_valid = data_dma_ram_rd_cmd_valid;
 
   // Ethernet (direct MAC interface - lowest latency raw traffic)
-  // assign m_axis_direct_tx_tdata = s_axis_direct_tx_tdata;
-  // assign m_axis_direct_tx_tkeep = s_axis_direct_tx_tkeep;
-  // assign m_axis_direct_tx_tvalid = s_axis_direct_tx_tvalid;
-  // assign s_axis_direct_tx_tready = m_axis_direct_tx_tready;
-  // assign m_axis_direct_tx_tlast = s_axis_direct_tx_tlast;
-  // assign m_axis_direct_tx_tuser = s_axis_direct_tx_tuser;
-
   assign m_axis_direct_tx_cpl_ts = s_axis_direct_tx_cpl_ts;
   assign m_axis_direct_tx_cpl_tag = s_axis_direct_tx_cpl_tag;
   assign m_axis_direct_tx_cpl_valid = s_axis_direct_tx_cpl_valid;
   assign s_axis_direct_tx_cpl_ready = m_axis_direct_tx_cpl_ready;
-
-  // assign m_axis_direct_rx_tdata = s_axis_direct_rx_tdata;
-  // assign m_axis_direct_rx_tkeep = s_axis_direct_rx_tkeep;
-  // assign m_axis_direct_rx_tvalid = s_axis_direct_rx_tvalid;
-  // assign s_axis_direct_rx_tready = m_axis_direct_rx_tready;
-  // assign m_axis_direct_rx_tlast = s_axis_direct_rx_tlast;
-  // assign m_axis_direct_rx_tuser = s_axis_direct_rx_tuser;
 
   // Ethernet (synchronous MAC interface - low latency raw traffic)
   assign m_axis_sync_tx_cpl_ts = s_axis_sync_tx_cpl_ts;

@@ -92,7 +92,7 @@ module prbs_mon #(
     .output_data(calculated_prbs_data)
   );
 
-  reg state;  // 0 - Waiting for first value
+  reg state;  // 0 - Waiting for initial sync value
               // 1 - Running
 
   reg [$clog2(OUT_OF_SYNC_THRESHOLD)-1:0] oos_counter;
@@ -107,10 +107,12 @@ module prbs_mon #(
     if (!rstn) begin
       bit_errors <= {DATA_WIDTH_2{1'b0}};
     end else begin
-      if (!state) begin
+      if (!state || init || out_of_sync) begin
         bit_errors <= {DATA_WIDTH_2{1'b0}};
       end else begin
-        bit_errors <= input_data ^ calculated_prbs_data;
+        if (input_valid) begin
+          bit_errors <= {{DATA_WIDTH_2-DATA_WIDTH{1'b0}}, input_data ^ calculated_prbs_data};
+        end
       end
     end
   end
