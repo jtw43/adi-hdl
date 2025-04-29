@@ -273,7 +273,8 @@ module application_tx #(
 
   header_inserter #(
     .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH),
-    .INPUT_WIDTH(INPUT_WIDTH)
+    .INPUT_WIDTH(INPUT_WIDTH),
+    .CHANNELS(CHANNELS)
   ) header_inserter_inst (
     .clk(clk),
     .rstn(rstn),
