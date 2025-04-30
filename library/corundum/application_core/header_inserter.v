@@ -40,9 +40,8 @@
 module header_inserter #(
 
   parameter AXIS_DATA_WIDTH = 512,
-  parameter INPUT_WIDTH = 2048,
   parameter CHANNELS = 4,
-  parameter INPUT_SAMPLE_SIZE = 16
+  parameter SAMPLE_DATA_WIDTH = 16
 ) (
 
   input  wire                         clk,
@@ -132,7 +131,7 @@ module header_inserter #(
     if (!rstn) begin
       udp_length <= 16'd0;
     end else begin
-      udp_length <= 16'h8 + sample_count*INPUT_SAMPLE_SIZE*input_enable;
+      udp_length <= 16'h8 + sample_count*SAMPLE_DATA_WIDTH*input_enable;
     end
   end
 

@@ -115,9 +115,9 @@ module application_core #
   parameter STAT_ID_WIDTH = 12,
 
   // Input stream
-  parameter INPUT_WIDTH = 2048,
   parameter INPUT_CHANNELS = 4,
-  parameter INPUT_SAMPLE_SIZE = 16,
+  parameter INPUT_SAMPLES_PER_CHANNEL = 16,
+  parameter INPUT_SAMPLE_DATA_WIDTH = 16,
 
   // Output stream
   parameter OUTPUT_WIDTH = 2048,
@@ -528,9 +528,9 @@ module application_core #
   input  wire                                           input_clk,
   input  wire                                           input_rstn,
 
-  input  wire [INPUT_WIDTH-1:0]                         input_axis_tdata,
-  input  wire                                           input_axis_tvalid,
-  output wire                                           input_axis_tready,
+  input  wire [INPUT_CHANNELS*INPUT_SAMPLES_PER_CHANNEL*INPUT_SAMPLE_DATA_WIDTH-1:0] input_axis_tdata,
+  input  wire                                                                        input_axis_tvalid,
+  output wire                                                                        input_axis_tready,
 
   input  wire [INPUT_CHANNELS-1:0]                      input_enable,
   output wire                                           input_packer_reset,
@@ -609,9 +609,9 @@ module application_core #
     .AXIS_DATA_WIDTH(AXIS_SYNC_DATA_WIDTH),
     .AXIS_KEEP_WIDTH(AXIS_SYNC_KEEP_WIDTH),
     .AXIS_TX_USER_WIDTH(AXIS_SYNC_TX_USER_WIDTH),
-    .INPUT_WIDTH(INPUT_WIDTH),
     .CHANNELS(INPUT_CHANNELS),
-    .INPUT_SAMPLE_SIZE(INPUT_SAMPLE_SIZE)
+    .SAMPLES_PER_CHANNEL(INPUT_SAMPLES_PER_CHANNEL),
+    .SAMPLE_DATA_WIDTH(INPUT_SAMPLE_DATA_WIDTH)
   ) application_tx_inst (
     .clk(clk),
     .rstn(rstn),

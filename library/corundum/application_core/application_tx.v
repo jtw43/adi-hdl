@@ -47,9 +47,9 @@ module application_tx #(
   parameter AXIS_TX_USER_WIDTH = 17,
 
   // Input stream
-  parameter INPUT_WIDTH = 2048,
   parameter CHANNELS = 4,
-  parameter INPUT_SAMPLE_SIZE = 16
+  parameter SAMPLES_PER_CHANNEL = 16,
+  parameter SAMPLE_DATA_WIDTH = 16
 ) (
 
   input  wire                            clk,
@@ -74,9 +74,9 @@ module application_tx #(
   input  wire                            input_clk,
   input  wire                            input_rstn,
 
-  input  wire [INPUT_WIDTH-1:0]          input_axis_tdata,
-  input  wire                            input_axis_tvalid,
-  output wire                            input_axis_tready,
+  input  wire [CHANNELS*SAMPLES_PER_CHANNEL*SAMPLE_DATA_WIDTH-1:0] input_axis_tdata,
+  input  wire                                                      input_axis_tvalid,
+  output wire                                                      input_axis_tready,
 
   input  wire [CHANNELS-1:0]             input_enable,
   output reg                             input_packer_reset,
@@ -111,6 +111,8 @@ module application_tx #(
   // Sample count per channel
   input  wire [15:0]                     sample_count
 );
+
+  localparam INPUT_WIDTH = CHANNELS*SAMPLES_PER_CHANNEL*SAMPLE_DATA_WIDTH;
 
   ////----------------------------------------Start application---------------//
   //////////////////////////////////////////////////
@@ -226,11 +228,6 @@ module application_tx #(
 
   // calculate the number of inputs base on enabled channels and requested samples
   reg  [15:0] input_counter;
-  // wire [15:0] input_count_requested;
-
-  // assign input_count_requested = converters(input_enable) * sample_count_cdc[15:$clog2(INPUT_WIDTH/INPUT_SAMPLE_SIZE)] +
-  //   ((INPUT_WIDTH > AXIS_DATA_WIDTH) ? ((sample_count_cdc[$clog2(INPUT_WIDTH/INPUT_SAMPLE_SIZE)-1:0] != 'd0) ? 1 : 0) : 0);
-
   reg  [15:0] input_sample_total_requested;
   wire [15:0] input_count_requested;
 
@@ -243,8 +240,8 @@ module application_tx #(
     end
   end
 
-  assign input_count_requested = input_sample_total_requested[15:$clog2(INPUT_WIDTH/INPUT_SAMPLE_SIZE)] +
-    ((INPUT_WIDTH > AXIS_DATA_WIDTH) ? ((input_sample_total_requested[$clog2(INPUT_WIDTH/INPUT_SAMPLE_SIZE)-1:0] != 'd0) ? 1 : 0) : 0);
+  assign input_count_requested = input_sample_total_requested[15:$clog2(INPUT_WIDTH/SAMPLE_DATA_WIDTH)] +
+    ((INPUT_WIDTH > AXIS_DATA_WIDTH) ? ((input_sample_total_requested[$clog2(INPUT_WIDTH/SAMPLE_DATA_WIDTH)-1:0] != 'd0) ? 1 : 0) : 0);
 
   wire input_axis_tvalid_buffered;
 
@@ -286,11 +283,18 @@ module application_tx #(
 
   // calculate the number of inputs base on enabled channels and requested samples
   reg  [15:0] output_counter;
-  wire [15:0] output_count_requested;
+  reg  [15:0] output_count_requested;
   wire [15:0] output_count_requested_max;
   reg         output_sent;
 
-  assign output_count_requested = converters(input_enable_cdc) * sample_count[15:$clog2(AXIS_DATA_WIDTH/INPUT_SAMPLE_SIZE)];
+  always @(posedge clk)
+  begin
+    if (!rstn) begin
+      output_count_requested <= 16'h0;
+    end else begin
+      output_count_requested <= converters(input_enable_cdc) * sample_count[15:$clog2(AXIS_DATA_WIDTH/SAMPLE_DATA_WIDTH)];
+    end
+  end
 
   assign output_count_requested_max = (INPUT_WIDTH > AXIS_DATA_WIDTH) ?
     output_count_requested[15:$clog2(INPUT_WIDTH/AXIS_DATA_WIDTH)] +
@@ -384,7 +388,7 @@ module application_tx #(
   packetizer #(
     .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH),
     .CHANNELS(CHANNELS),
-    .INPUT_SAMPLE_SIZE(INPUT_SAMPLE_SIZE)
+    .SAMPLE_DATA_WIDTH(SAMPLE_DATA_WIDTH)
   ) packetizer_inst (
     .clk(clk),
     .rstn(rstn),
@@ -415,9 +419,8 @@ module application_tx #(
 
   header_inserter #(
     .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH),
-    .INPUT_WIDTH(INPUT_WIDTH),
     .CHANNELS(CHANNELS),
-    .INPUT_SAMPLE_SIZE(INPUT_SAMPLE_SIZE)
+    .SAMPLE_DATA_WIDTH(SAMPLE_DATA_WIDTH)
   ) header_inserter_inst (
     .clk(clk),
     .rstn(rstn),

@@ -39,7 +39,7 @@ module packetizer #(
 
   parameter AXIS_DATA_WIDTH = 512,
   parameter CHANNELS = 4,
-  parameter INPUT_SAMPLE_SIZE = 16
+  parameter SAMPLE_DATA_WIDTH = 16
 ) (
 
   input  wire                         clk,
@@ -58,7 +58,7 @@ module packetizer #(
   reg  [15:0] packet_size_dynamic;
   wire [15:0] packet_size_dynamic_calc;
 
-  assign packet_size_dynamic_calc = sample_count[15:$clog2(AXIS_DATA_WIDTH/INPUT_SAMPLE_SIZE)]*input_enable;
+  assign packet_size_dynamic_calc = sample_count[15:$clog2(AXIS_DATA_WIDTH/SAMPLE_DATA_WIDTH)]*input_enable;
 
   always @(posedge clk)
   begin
