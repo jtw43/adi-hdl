@@ -103,219 +103,228 @@ module application_regmap #(
 
   input  wire [63:0]                     total_bits,
   input  wire [63:0]                     error_bits_total,
-  input  wire [31:0]                     out_of_sync_total
+  input  wire [31:0]                     out_of_sync_total,
+
+  // Sample count per channel
+  output reg  [15:0]                     sample_count
 );
 
-wire                              up_wreq;
-wire [(AXIL_CTRL_ADDR_WIDTH-3):0] up_waddr;
-wire [31:0]                       up_wdata;
-reg                               up_wack;
-wire                              up_rreq;
-wire [(AXIL_CTRL_ADDR_WIDTH-3):0] up_raddr;
-reg  [31:0]                       up_rdata;
-reg                               up_rack;
+  wire                              up_wreq;
+  wire [(AXIL_CTRL_ADDR_WIDTH-3):0] up_waddr;
+  wire [31:0]                       up_wdata;
+  reg                               up_wack;
+  wire                              up_rreq;
+  wire [(AXIL_CTRL_ADDR_WIDTH-3):0] up_raddr;
+  reg  [31:0]                       up_rdata;
+  reg                               up_rack;
 
-wire [63:0] total_bits_cdc;
-wire [63:0] error_bits_total_cdc;
-wire [31:0] out_of_sync_total_cdc;
+  wire [63:0] total_bits_cdc;
+  wire [63:0] error_bits_total_cdc;
+  wire [31:0] out_of_sync_total_cdc;
 
-sync_bits #(
-  .NUM_OF_BITS(64)
-) sync_bits_total_bits (
-  .in_bits(total_bits),
-  .out_resetn(rstn),
-  .out_clk(clk),
-  .out_bits(total_bits_cdc)
-);
+  sync_bits #(
+    .NUM_OF_BITS(64)
+  ) sync_bits_total_bits (
+    .in_bits(total_bits),
+    .out_resetn(rstn),
+    .out_clk(clk),
+    .out_bits(total_bits_cdc)
+  );
 
-sync_bits #(
-  .NUM_OF_BITS(64)
-) sync_bits_error_bits_total (
-  .in_bits(error_bits_total),
-  .out_resetn(rstn),
-  .out_clk(clk),
-  .out_bits(error_bits_total_cdc)
-);
+  sync_bits #(
+    .NUM_OF_BITS(64)
+  ) sync_bits_error_bits_total (
+    .in_bits(error_bits_total),
+    .out_resetn(rstn),
+    .out_clk(clk),
+    .out_bits(error_bits_total_cdc)
+  );
 
-sync_bits #(
-  .NUM_OF_BITS(32)
-) sync_bits_out_of_sync_total (
-  .in_bits(out_of_sync_total),
-  .out_resetn(rstn),
-  .out_clk(clk),
-  .out_bits(out_of_sync_total_cdc)
-);
+  sync_bits #(
+    .NUM_OF_BITS(32)
+  ) sync_bits_out_of_sync_total (
+    .in_bits(out_of_sync_total),
+    .out_resetn(rstn),
+    .out_clk(clk),
+    .out_bits(out_of_sync_total_cdc)
+  );
 
-// Generic
-reg [31:0] version_reg = 'h1234ABCD;
-reg [31:0] scratch_reg;
-reg [15:0] insert_bit_error_reg;
+  // Generic
+  reg [31:0] version_reg = 'h1234ABCD;
+  reg [31:0] scratch_reg;
+  reg [15:0] insert_bit_error_reg;
 
-assign insert_bit_error = insert_bit_error_reg[15];
+  assign insert_bit_error = insert_bit_error_reg[15];
 
-always @(posedge clk)
-begin
-  if (rstn == 1'b0) begin
-    up_wack <= 1'b0;
-    up_rack <= 1'b0;
+  always @(posedge clk)
+  begin
+    if (rstn == 1'b0) begin
+      up_wack <= 1'b0;
+      up_rack <= 1'b0;
 
-    // Generic
-    scratch_reg <= 'h0;
-    start_counter_reg <= 1'b0;
-    // Data generator
-    start_app <= 1'b0;
-    // Packetizer
-    packet_size <= 16'd1024;
-    // Ethernet header
-    ethernet_destination_MAC <= 48'hB83FD22A0BF1;
-    ethernet_source_MAC <= 48'h000A35000102;
-    ethernet_type <= 16'h0800;
-    // IPv4 header
-    ip_version <= 4'h4;
-    ip_header_length <= 4'h5;
-    ip_type_of_service <= 8'h00;
-    ip_identification <= 16'h0000;
-    ip_flags <= 3'h0;
-    ip_fragment_offset <= 13'h0000;
-    ip_time_to_live <= 8'h80;
-    ip_protocol <= 8'h11;
-    ip_source_IP_address <= {8'd192, 8'd168, 8'd0, 8'd69};
-    ip_destination_IP_address <= {8'd192, 8'd168, 8'd0, 8'd10};
-    // UDP header
-    udp_source <= 16'h1234;
-    udp_destination <= 16'h5678;
-    udp_checksum <= 16'h0000;
-    // BER testing
-    ber_test <= 1'b0;
-    reset_ber <= 1'b0;
-    insert_bit_error_reg <= {16{1'b0}};
-  end else begin
-    up_wack <= up_wreq;
-    up_rack <= up_rreq;
-
-    if (up_wreq == 1'b1) begin
-      case (up_waddr)
-        // Generic
-        'h1: scratch_reg <= up_wdata;
-        'h2: start_counter_reg <= up_wdata[0];
-        // Data generator
-        'h5: start_app <= up_wdata[0];
-        // Packetizer
-        'h6: packet_size <= up_wdata[15:0];
-        // Ethernet header
-        'h7: ethernet_destination_MAC[48-1:32] <= up_wdata[16-1:0];
-        'h8: ethernet_destination_MAC[31:0] <= up_wdata;
-        'h9: ethernet_source_MAC[48-1:32] <= up_wdata[16-1:0];
-        'hA: ethernet_source_MAC[31:0] <= up_wdata;
-        'hB: ethernet_type <= up_wdata[16-1:0];
-        // IPv4 header
-        'hC: ip_version <= up_wdata[4-1:0];
-        'hD: ip_header_length <= up_wdata[4-1:0];
-        'hE: ip_type_of_service <= up_wdata[8-1:0];
-        'h10: ip_identification <= up_wdata[16-1:0];
-        'h11: ip_flags <= up_wdata[3-1:0];
-        'h12: ip_fragment_offset <= up_wdata[13-1:0];
-        'h13: ip_time_to_live <= up_wdata[8-1:0];
-        'h14: ip_protocol <= up_wdata[8-1:0];
-        'h16: ip_source_IP_address <= up_wdata[32-1:0];
-        'h17: ip_destination_IP_address <= up_wdata[32-1:0];
-        // UDP header
-        'h18: udp_source <= up_wdata[16-1:0];
-        'h19: udp_destination <= up_wdata[16-1:0];
-        'h1B: udp_checksum <= up_wdata[16-1:0];
-        // BER testing
-        'h1C: ber_test <= up_wdata[0];
-        'h1D: reset_ber <= up_wdata[0];
-        'h23: insert_bit_error_reg <= {16{up_wdata[0]}};
-        default: ;
-      endcase
-    end else begin
+      // Generic
+      scratch_reg <= 'h0;
       start_counter_reg <= 1'b0;
+      // Data generator
+      start_app <= 1'b0;
+      // Packetizer
+      packet_size <= 16'd1024;
+      // Ethernet header
+      ethernet_destination_MAC <= 48'hB83FD22A0BF1;
+      ethernet_source_MAC <= 48'h000A35000102;
+      ethernet_type <= 16'h0800;
+      // IPv4 header
+      ip_version <= 4'h4;
+      ip_header_length <= 4'h5;
+      ip_type_of_service <= 8'h00;
+      ip_identification <= 16'h0000;
+      ip_flags <= 3'h0;
+      ip_fragment_offset <= 13'h0000;
+      ip_time_to_live <= 8'h80;
+      ip_protocol <= 8'h11;
+      ip_source_IP_address <= {8'd192, 8'd168, 8'd0, 8'd69};
+      ip_destination_IP_address <= {8'd192, 8'd168, 8'd0, 8'd10};
+      // UDP header
+      udp_source <= 16'h1234;
+      udp_destination <= 16'h5678;
+      udp_checksum <= 16'h0000;
+      // BER testing
+      ber_test <= 1'b0;
       reset_ber <= 1'b0;
-      insert_bit_error_reg <= {insert_bit_error_reg[14:0], 1'b0};
-    end
-
-    if (up_rreq == 1'b1) begin
-      case (up_raddr)
-        // Generic
-        'h0: up_rdata <= version_reg;
-        'h1: up_rdata <= scratch_reg;
-        'h2: up_rdata <= {{31{1'b0}}, start_counter_reg};
-        'h4: up_rdata <= counter_reg;
-        // Data generator
-        'h5: up_rdata <= {{31{1'b0}}, start_app};
-        // Packetizer
-        'h6: up_rdata <= {{16{1'b0}}, packet_size};
-        // Ethernet header
-        'h7: up_rdata <= {{16{1'b0}}, ethernet_destination_MAC[48-1:32]};
-        'h8: up_rdata <= ethernet_destination_MAC[31:0];
-        'h9: up_rdata <= {{16{1'b0}}, ethernet_source_MAC[48-1:32]};
-        'hA: up_rdata <= ethernet_source_MAC[31:0];
-        'hB: up_rdata <= {{16{1'b0}}, ethernet_type};
-        // IPv4 header
-        'hC: up_rdata <= {{28{1'b0}}, ip_version};
-        'hD: up_rdata <= {{28{1'b0}}, ip_header_length};
-        'hE: up_rdata <= {{24{1'b0}}, ip_type_of_service};
-        'hF: up_rdata <= {{16{1'b0}}, ip_total_length};
-        'h10: up_rdata <= {{16{1'b0}}, ip_identification};
-        'h11: up_rdata <= {{29{1'b0}}, ip_flags};
-        'h12: up_rdata <= {{19{1'b0}}, ip_fragment_offset};
-        'h13: up_rdata <= {{24{1'b0}}, ip_time_to_live};
-        'h14: up_rdata <= {{24{1'b0}}, ip_protocol};
-        'h15: up_rdata <= {{16{1'b0}}, ip_header_checksum};
-        'h16: up_rdata <= ip_source_IP_address;
-        'h17: up_rdata <= ip_destination_IP_address;
-        // UDP header
-        'h18: up_rdata <= {{16{1'b0}}, udp_source};
-        'h19: up_rdata <= {{16{1'b0}}, udp_destination};
-        'h1A: up_rdata <= {{16{1'b0}}, udp_length};
-        'h1B: up_rdata <= {{16{1'b0}}, udp_checksum};
-        // BER testing
-        'h1C: up_rdata <= {{31{1'b0}}, ber_test};
-        'h1D: up_rdata <= {{31{1'b0}}, reset_ber};
-        'h1E: up_rdata <= total_bits_cdc[63:32];
-        'h1F: up_rdata <= total_bits_cdc[31:0];
-        'h20: up_rdata <= error_bits_total_cdc[63:32];
-        'h21: up_rdata <= error_bits_total_cdc[31:0];
-        'h22: up_rdata <= out_of_sync_total_cdc;
-        'h23: up_rdata <= {{31{1'b0}}, insert_bit_error_reg[0]};
-        default: up_rdata <= 32'd0;
-      endcase
+      insert_bit_error_reg <= {16{1'b0}};
+      // Sample count per channel
+      sample_count <= 16'd64;
     end else begin
-      up_rdata <= 32'd0;
+      up_wack <= up_wreq;
+      up_rack <= up_rreq;
+
+      if (up_wreq == 1'b1) begin
+        case (up_waddr)
+          // Generic
+          'h1: scratch_reg <= up_wdata;
+          'h2: start_counter_reg <= up_wdata[0];
+          // Data generator
+          'h5: start_app <= up_wdata[0];
+          // Packetizer
+          'h6: packet_size <= up_wdata[15:0];
+          // Ethernet header
+          'h7: ethernet_destination_MAC[48-1:32] <= up_wdata[16-1:0];
+          'h8: ethernet_destination_MAC[31:0] <= up_wdata;
+          'h9: ethernet_source_MAC[48-1:32] <= up_wdata[16-1:0];
+          'hA: ethernet_source_MAC[31:0] <= up_wdata;
+          'hB: ethernet_type <= up_wdata[16-1:0];
+          // IPv4 header
+          'hC: ip_version <= up_wdata[4-1:0];
+          'hD: ip_header_length <= up_wdata[4-1:0];
+          'hE: ip_type_of_service <= up_wdata[8-1:0];
+          'h10: ip_identification <= up_wdata[16-1:0];
+          'h11: ip_flags <= up_wdata[3-1:0];
+          'h12: ip_fragment_offset <= up_wdata[13-1:0];
+          'h13: ip_time_to_live <= up_wdata[8-1:0];
+          'h14: ip_protocol <= up_wdata[8-1:0];
+          'h16: ip_source_IP_address <= up_wdata[32-1:0];
+          'h17: ip_destination_IP_address <= up_wdata[32-1:0];
+          // UDP header
+          'h18: udp_source <= up_wdata[16-1:0];
+          'h19: udp_destination <= up_wdata[16-1:0];
+          'h1B: udp_checksum <= up_wdata[16-1:0];
+          // BER testing
+          'h1C: ber_test <= up_wdata[0];
+          'h1D: reset_ber <= up_wdata[0];
+          'h23: insert_bit_error_reg <= {16{up_wdata[0]}};
+          // Sample count per channel
+          'h24: sample_count <= up_wdata[15:0];
+          default: ;
+        endcase
+      end else begin
+        start_counter_reg <= 1'b0;
+        reset_ber <= 1'b0;
+        insert_bit_error_reg <= {insert_bit_error_reg[14:0], 1'b0};
+      end
+
+      if (up_rreq == 1'b1) begin
+        case (up_raddr)
+          // Generic
+          'h0: up_rdata <= version_reg;
+          'h1: up_rdata <= scratch_reg;
+          'h2: up_rdata <= {{31{1'b0}}, start_counter_reg};
+          'h4: up_rdata <= counter_reg;
+          // Data generator
+          'h5: up_rdata <= {{31{1'b0}}, start_app};
+          // Packetizer
+          'h6: up_rdata <= {{16{1'b0}}, packet_size};
+          // Ethernet header
+          'h7: up_rdata <= {{16{1'b0}}, ethernet_destination_MAC[48-1:32]};
+          'h8: up_rdata <= ethernet_destination_MAC[31:0];
+          'h9: up_rdata <= {{16{1'b0}}, ethernet_source_MAC[48-1:32]};
+          'hA: up_rdata <= ethernet_source_MAC[31:0];
+          'hB: up_rdata <= {{16{1'b0}}, ethernet_type};
+          // IPv4 header
+          'hC: up_rdata <= {{28{1'b0}}, ip_version};
+          'hD: up_rdata <= {{28{1'b0}}, ip_header_length};
+          'hE: up_rdata <= {{24{1'b0}}, ip_type_of_service};
+          'hF: up_rdata <= {{16{1'b0}}, ip_total_length};
+          'h10: up_rdata <= {{16{1'b0}}, ip_identification};
+          'h11: up_rdata <= {{29{1'b0}}, ip_flags};
+          'h12: up_rdata <= {{19{1'b0}}, ip_fragment_offset};
+          'h13: up_rdata <= {{24{1'b0}}, ip_time_to_live};
+          'h14: up_rdata <= {{24{1'b0}}, ip_protocol};
+          'h15: up_rdata <= {{16{1'b0}}, ip_header_checksum};
+          'h16: up_rdata <= ip_source_IP_address;
+          'h17: up_rdata <= ip_destination_IP_address;
+          // UDP header
+          'h18: up_rdata <= {{16{1'b0}}, udp_source};
+          'h19: up_rdata <= {{16{1'b0}}, udp_destination};
+          'h1A: up_rdata <= {{16{1'b0}}, udp_length};
+          'h1B: up_rdata <= {{16{1'b0}}, udp_checksum};
+          // BER testing
+          'h1C: up_rdata <= {{31{1'b0}}, ber_test};
+          'h1D: up_rdata <= {{31{1'b0}}, reset_ber};
+          'h1E: up_rdata <= total_bits_cdc[63:32];
+          'h1F: up_rdata <= total_bits_cdc[31:0];
+          'h20: up_rdata <= error_bits_total_cdc[63:32];
+          'h21: up_rdata <= error_bits_total_cdc[31:0];
+          'h22: up_rdata <= out_of_sync_total_cdc;
+          'h23: up_rdata <= {{31{1'b0}}, insert_bit_error_reg[0]};
+          // Sample count per channel
+          'h24: up_rdata <= {{16{1'b0}}, sample_count};
+          default: up_rdata <= 32'd0;
+        endcase
+      end else begin
+        up_rdata <= 32'd0;
+      end
     end
   end
-end
 
-up_axi #(
-  .AXI_ADDRESS_WIDTH(AXIL_CTRL_ADDR_WIDTH)
-) i_up_axi (
-  .up_rstn            (rstn),
-  .up_clk             (clk),
-  .up_axi_awvalid     (s_axil_ctrl_awvalid),
-  .up_axi_awaddr      (s_axil_ctrl_awaddr),
-  .up_axi_awready     (s_axil_ctrl_awready),
-  .up_axi_wvalid      (s_axil_ctrl_wvalid),
-  .up_axi_wdata       (s_axil_ctrl_wdata),
-  .up_axi_wstrb       (s_axil_ctrl_wstrb),
-  .up_axi_wready      (s_axil_ctrl_wready),
-  .up_axi_bvalid      (s_axil_ctrl_bvalid),
-  .up_axi_bresp       (s_axil_ctrl_bresp),
-  .up_axi_bready      (s_axil_ctrl_bready),
-  .up_axi_arvalid     (s_axil_ctrl_arvalid),
-  .up_axi_araddr      (s_axil_ctrl_araddr),
-  .up_axi_arready     (s_axil_ctrl_arready),
-  .up_axi_rvalid      (s_axil_ctrl_rvalid),
-  .up_axi_rresp       (s_axil_ctrl_rresp),
-  .up_axi_rdata       (s_axil_ctrl_rdata),
-  .up_axi_rready      (s_axil_ctrl_rready),
-  .up_wreq            (up_wreq),
-  .up_waddr           (up_waddr),
-  .up_wdata           (up_wdata),
-  .up_wack            (up_wack),
-  .up_rreq            (up_rreq),
-  .up_raddr           (up_raddr),
-  .up_rdata           (up_rdata),
-  .up_rack            (up_rack));
+  up_axi #(
+    .AXI_ADDRESS_WIDTH(AXIL_CTRL_ADDR_WIDTH)
+  ) i_up_axi (
+    .up_rstn            (rstn),
+    .up_clk             (clk),
+    .up_axi_awvalid     (s_axil_ctrl_awvalid),
+    .up_axi_awaddr      (s_axil_ctrl_awaddr),
+    .up_axi_awready     (s_axil_ctrl_awready),
+    .up_axi_wvalid      (s_axil_ctrl_wvalid),
+    .up_axi_wdata       (s_axil_ctrl_wdata),
+    .up_axi_wstrb       (s_axil_ctrl_wstrb),
+    .up_axi_wready      (s_axil_ctrl_wready),
+    .up_axi_bvalid      (s_axil_ctrl_bvalid),
+    .up_axi_bresp       (s_axil_ctrl_bresp),
+    .up_axi_bready      (s_axil_ctrl_bready),
+    .up_axi_arvalid     (s_axil_ctrl_arvalid),
+    .up_axi_araddr      (s_axil_ctrl_araddr),
+    .up_axi_arready     (s_axil_ctrl_arready),
+    .up_axi_rvalid      (s_axil_ctrl_rvalid),
+    .up_axi_rresp       (s_axil_ctrl_rresp),
+    .up_axi_rdata       (s_axil_ctrl_rdata),
+    .up_axi_rready      (s_axil_ctrl_rready),
+    .up_wreq            (up_wreq),
+    .up_waddr           (up_waddr),
+    .up_wdata           (up_wdata),
+    .up_wack            (up_wack),
+    .up_rreq            (up_rreq),
+    .up_raddr           (up_raddr),
+    .up_rdata           (up_rdata),
+    .up_rack            (up_rack));
 
 endmodule

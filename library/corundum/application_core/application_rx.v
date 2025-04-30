@@ -289,6 +289,8 @@ module application_rx #(
     .m_axis_tlast(),
     .m_axis_empty(),
     .m_axis_almost_empty(),
+    .m_axis_full(),
+    .m_axis_almost_full(),
     .m_axis_level(),
 
     .s_axis_aclk(clk),
@@ -298,6 +300,8 @@ module application_rx #(
     .s_axis_data(input_axis_tdata_reg[1]),
     .s_axis_tkeep(input_axis_tkeep_reg[1]),
     .s_axis_tlast(input_axis_tlast_reg),
+    .s_axis_empty(),
+    .s_axis_almost_empty(),
     .s_axis_full(),
     .s_axis_almost_full(),
     .s_axis_room());

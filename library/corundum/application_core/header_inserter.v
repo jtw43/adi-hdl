@@ -41,7 +41,8 @@ module header_inserter #(
 
   parameter AXIS_DATA_WIDTH = 512,
   parameter INPUT_WIDTH = 2048,
-  parameter CHANNELS = 4
+  parameter CHANNELS = 4,
+  parameter INPUT_SAMPLE_SIZE = 16
 ) (
 
   input  wire                         clk,
@@ -72,8 +73,8 @@ module header_inserter #(
   output reg  [16-1:0]                udp_length,
   input  wire [16-1:0]                udp_checksum,
 
-  input  wire [CHANNELS-1:0]          input_enable,
-  input  wire [16-1:0]                packet_size,
+  input  wire [$clog2(CHANNELS):0]    input_enable,
+  input  wire [15:0]                  sample_count,
 
   // Control signals
   input  wire                         run_packetizer,
@@ -93,16 +94,6 @@ module header_inserter #(
   output reg  [AXIS_DATA_WIDTH/8-1:0] output_axis_tkeep,
   output reg                          output_axis_tlast
 );
-
-  function [$clog2(CHANNELS):0] converters(input [CHANNELS-1:0] input_enable);
-    integer i;
-    begin
-      converters = 0;
-      for (i=0; i<CHANNELS; i=i+1) begin
-        converters = converters + input_enable[i];
-      end
-    end
-  endfunction
 
   `HTOND(16)
   `HTOND(32)
@@ -141,7 +132,7 @@ module header_inserter #(
     if (!rstn) begin
       udp_length <= 16'd0;
     end else begin
-      udp_length <= 16'h8 + packet_size/(2**$clog2(CHANNELS))*converters(input_enable);
+      udp_length <= 16'h8 + sample_count*INPUT_SAMPLE_SIZE*input_enable;
     end
   end
 

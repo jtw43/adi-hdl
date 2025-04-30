@@ -48,7 +48,8 @@ module application_tx #(
 
   // Input stream
   parameter INPUT_WIDTH = 2048,
-  parameter CHANNELS = 4
+  parameter CHANNELS = 4,
+  parameter INPUT_SAMPLE_SIZE = 16
 ) (
 
   input  wire                            clk,
@@ -78,9 +79,9 @@ module application_tx #(
   output wire                            input_axis_tready,
 
   input  wire [CHANNELS-1:0]             input_enable,
+  output reg                             input_packer_reset,
 
   input  wire                            start_app,
-  input  wire [15:0]                     packet_size,
 
   // Ethernet header
   input  wire [48-1:0]                   ethernet_destination_MAC,
@@ -105,7 +106,10 @@ module application_tx #(
   input  wire [16-1:0]                   udp_source,
   input  wire [16-1:0]                   udp_destination,
   output wire [16-1:0]                   udp_length,
-  input  wire [16-1:0]                   udp_checksum
+  input  wire [16-1:0]                   udp_checksum,
+
+  // Sample count per channel
+  input  wire [15:0]                     sample_count
 );
 
   ////----------------------------------------Start application---------------//
@@ -151,18 +155,198 @@ module application_tx #(
   ////----------------------------------------Buffer, CDC and Scaling FIFO----//
   //////////////////////////////////////////////////
 
+  function [$clog2(CHANNELS):0] converters(input [CHANNELS-1:0] input_enable);
+    integer i;
+    begin
+      converters = 0;
+      for (i=0; i<CHANNELS; i=i+1) begin
+        converters = converters + input_enable[i];
+      end
+    end
+  endfunction
+
+  // CDC input enable signals
+  reg  [CHANNELS-1:0] input_enable_old;
+  reg                 input_enable_ff;
+  wire                input_enable_ff_cdc;
+  reg                 input_enable_ff_cdc2;
+  reg  [CHANNELS-1:0] input_enable_cdc;
+
+  always @(posedge input_clk)
+  begin
+    if (!input_rstn) begin
+      input_enable_ff <= 1'b0;
+    end else begin
+      input_enable_old <= input_enable;
+      if (input_enable_old != input_enable) begin
+        input_enable_ff <= ~input_enable_ff;
+      end
+    end
+  end
+
+  sync_bits #(
+    .NUM_OF_BITS(1)
+  ) sync_bits_input_enable_ff (
+    .in_bits(input_enable_ff),
+    .out_resetn(rstn),
+    .out_clk(clk),
+    .out_bits(input_enable_ff_cdc)
+  );
+
+  always @(posedge clk)
+  begin
+    if (!rstn) begin
+      input_enable_ff_cdc2 <= 1'b0;
+    end else begin
+      input_enable_ff_cdc2 <= input_enable_ff_cdc;
+    end
+  end
+
+  always @(posedge clk)
+  begin
+    if (!rstn) begin
+      input_enable_cdc <= {CHANNELS{1'b0}};
+    end else begin
+      if (input_enable_ff_cdc2 ^ input_enable_ff_cdc) begin
+        input_enable_cdc <= input_enable;
+      end
+    end
+  end
+
+  wire [15:0] sample_count_cdc;
+
+  sync_bits #(
+    .NUM_OF_BITS(16)
+  ) sync_bits_sample_count (
+    .in_bits(sample_count),
+    .out_resetn(input_rstn),
+    .out_clk(input_clk),
+    .out_bits(sample_count_cdc)
+  );
+
+  // calculate the number of inputs base on enabled channels and requested samples
+  reg  [15:0] input_counter;
+  // wire [15:0] input_count_requested;
+
+  // assign input_count_requested = converters(input_enable) * sample_count_cdc[15:$clog2(INPUT_WIDTH/INPUT_SAMPLE_SIZE)] +
+  //   ((INPUT_WIDTH > AXIS_DATA_WIDTH) ? ((sample_count_cdc[$clog2(INPUT_WIDTH/INPUT_SAMPLE_SIZE)-1:0] != 'd0) ? 1 : 0) : 0);
+
+  reg  [15:0] input_sample_total_requested;
+  wire [15:0] input_count_requested;
+
+  always @(posedge input_clk)
+  begin
+    if (!input_rstn) begin
+      input_sample_total_requested <= 16'h0;
+    end else begin
+      input_sample_total_requested <= converters(input_enable) * sample_count_cdc;
+    end
+  end
+
+  assign input_count_requested = input_sample_total_requested[15:$clog2(INPUT_WIDTH/INPUT_SAMPLE_SIZE)] +
+    ((INPUT_WIDTH > AXIS_DATA_WIDTH) ? ((input_sample_total_requested[$clog2(INPUT_WIDTH/INPUT_SAMPLE_SIZE)-1:0] != 'd0) ? 1 : 0) : 0);
+
+  wire input_axis_tvalid_buffered;
+
+  always @(posedge input_clk)
+  begin
+    if (!input_rstn) begin
+      input_counter <= 'd1;
+    end else begin
+      if (input_counter >= input_count_requested) begin
+        input_counter <= 'd1;
+      end else begin
+        if (input_axis_tvalid_buffered && input_axis_tready_buffered && !input_packer_reset) begin
+          input_counter <= input_counter + 1;
+        end
+      end
+    end
+  end
+
+  // packetizer reset logic
+  wire input_fifo_almost_empty;
+  wire input_fifo_almost_full;
+
+  always @(posedge input_clk)
+  begin
+    if (!input_rstn) begin
+      input_packer_reset <= 1'b0;
+    end else begin
+      if (input_fifo_almost_empty) begin
+        input_packer_reset <= 1'b0;
+      end else begin
+        if (input_counter == input_count_requested && input_fifo_almost_full) begin
+          input_packer_reset <= 1'b1;
+        end
+      end
+    end
+  end
+
+  assign input_axis_tvalid_buffered = input_axis_tvalid && !input_packer_reset;
+
+  // calculate the number of inputs base on enabled channels and requested samples
+  reg  [15:0] output_counter;
+  wire [15:0] output_count_requested;
+  wire [15:0] output_count_requested_max;
+  reg         output_sent;
+
+  assign output_count_requested = converters(input_enable_cdc) * sample_count[15:$clog2(AXIS_DATA_WIDTH/INPUT_SAMPLE_SIZE)];
+
+  assign output_count_requested_max = (INPUT_WIDTH > AXIS_DATA_WIDTH) ?
+    output_count_requested[15:$clog2(INPUT_WIDTH/AXIS_DATA_WIDTH)] +
+      ((output_count_requested[$clog2(INPUT_WIDTH/AXIS_DATA_WIDTH)-1:0] == 0) ? 'd0 : INPUT_WIDTH/AXIS_DATA_WIDTH) :
+    output_count_requested;
+
+  wire [AXIS_DATA_WIDTH-1:0] cdc_axis_tdata;
   wire                       cdc_axis_tvalid;
   wire                       cdc_axis_tready;
-  wire [AXIS_DATA_WIDTH-1:0] cdc_axis_tdata;
+  reg                        cdc_axis_tvalid_gated;
+  reg                        cdc_axis_tready_gated;
+
+  always @(posedge clk)
+  begin
+    if (!rstn) begin
+      output_counter <= 'd1;
+    end else begin
+      if (output_counter == output_count_requested_max) begin
+        output_counter <= 'd1;
+      end else begin
+        if (cdc_axis_tvalid && cdc_axis_tready) begin
+          output_counter <= output_counter + 1;
+        end
+      end
+    end
+  end
+
+  always @(posedge clk)
+  begin
+    if (!rstn) begin
+      output_sent <= 1'b0;
+    end else begin
+      if (output_counter >= output_count_requested_max) begin
+        output_sent <= 1'b0;
+      end else begin
+        if (output_counter == output_count_requested) begin
+          output_sent <= 1'b1;
+        end
+      end
+    end
+  end
+
+  always @(*)
+  begin
+    cdc_axis_tvalid_gated = (output_sent) ? 1'b0 : cdc_axis_tvalid && run_packetizer;
+    cdc_axis_tready_gated = output_sent || cdc_axis_tready;
+  end
 
   util_axis_fifo_asym #(
     .ASYNC_CLK(1),
     .S_DATA_WIDTH(INPUT_WIDTH),
-    .ADDRESS_WIDTH($clog2(8192/INPUT_WIDTH)+1),
+    .ADDRESS_WIDTH($clog2(12288/INPUT_WIDTH)+1),
     .M_DATA_WIDTH(AXIS_DATA_WIDTH),
     .M_AXIS_REGISTERED(1),
-    .ALMOST_EMPTY_THRESHOLD(0),
-    .ALMOST_FULL_THRESHOLD(0),
+    .ALMOST_EMPTY_THRESHOLD(12288/INPUT_WIDTH),
+    .ALMOST_FULL_THRESHOLD(12288/INPUT_WIDTH),
     .TLAST_EN(0),
     .TKEEP_EN(0),
     .FIFO_LIMITED(0),
@@ -170,86 +354,44 @@ module application_tx #(
   ) cdc_scale_fifo (
     .m_axis_aclk(clk),
     .m_axis_aresetn(rstn_gated),
-    .m_axis_ready(cdc_axis_tready),
+    .m_axis_ready(cdc_axis_tready_gated),
     .m_axis_valid(cdc_axis_tvalid),
     .m_axis_data(cdc_axis_tdata),
     .m_axis_tkeep(),
     .m_axis_tlast(),
     .m_axis_empty(),
     .m_axis_almost_empty(),
+    .m_axis_full(),
+    .m_axis_almost_full(),
     .m_axis_level(),
 
     .s_axis_aclk(input_clk),
     .s_axis_aresetn(input_rstn_gated),
     .s_axis_ready(input_axis_tready_buffered),
-    .s_axis_valid(input_axis_tvalid),
+    .s_axis_valid(input_axis_tvalid_buffered),
     .s_axis_data(input_axis_tdata),
-    .s_axis_tkeep({INPUT_WIDTH/8{1'b0}}),
-    .s_axis_tlast(1'b0),
+    .s_axis_tkeep({INPUT_WIDTH/8{1'b1}}),
+    .s_axis_tlast(1'b1),
+    .s_axis_empty(),
+    .s_axis_almost_empty(input_fifo_almost_empty),
     .s_axis_full(),
-    .s_axis_almost_full(),
+    .s_axis_almost_full(input_fifo_almost_full),
     .s_axis_room());
 
   ////----------------------------------------Packetizer--------------------//
   //////////////////////////////////////////////////
 
-    reg  [CHANNELS-1:0] input_enable_old;
-    reg                 input_enable_ff;
-    wire                input_enable_ff_cdc;
-    reg                 input_enable_ff_cdc2;
-    reg  [CHANNELS-1:0] input_enable_cdc;
-
-    always @(posedge input_clk)
-    begin
-      if (!input_rstn) begin
-        input_enable_ff <= 1'b0;
-      end else begin
-        input_enable_old <= input_enable;
-        if (input_enable_old != input_enable) begin
-          input_enable_ff <= ~input_enable_ff;
-        end
-      end
-    end
-
-    sync_bits #(
-      .NUM_OF_BITS(1)
-    ) sync_bits_input_enable_ff (
-      .in_bits(input_enable_ff),
-      .out_resetn(rstn),
-      .out_clk(clk),
-      .out_bits(input_enable_ff_cdc)
-    );
-
-    always @(posedge clk)
-    begin
-      if (!rstn) begin
-        input_enable_ff_cdc2 <= 1'b0;
-      end else begin
-        input_enable_ff_cdc2 <= input_enable_ff_cdc;
-      end
-    end
-
-    always @(posedge clk)
-    begin
-      if (!rstn) begin
-        input_enable_cdc <= {CHANNELS{1'b0}};
-      end else begin
-        if (input_enable_ff_cdc2 ^ input_enable_ff_cdc) begin
-          input_enable_cdc <= input_enable;
-        end
-      end
-    end
-
   packetizer #(
     .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH),
-    .CHANNELS(CHANNELS)
+    .CHANNELS(CHANNELS),
+    .INPUT_SAMPLE_SIZE(INPUT_SAMPLE_SIZE)
   ) packetizer_inst (
     .clk(clk),
     .rstn(rstn),
-    .input_axis_tvalid(cdc_axis_tvalid),
+    .input_axis_tvalid(cdc_axis_tvalid_gated),
     .input_axis_tready(cdc_axis_tready),
-    .input_enable(input_enable_cdc),
-    .packet_size(packet_size),
+    .input_enable(converters(input_enable_cdc)),
+    .sample_count(sample_count),
     .packet_tlast(packet_tlast));
 
   ////----------------------------------------Header Inserter---------------//
@@ -274,7 +416,8 @@ module application_tx #(
   header_inserter #(
     .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH),
     .INPUT_WIDTH(INPUT_WIDTH),
-    .CHANNELS(CHANNELS)
+    .CHANNELS(CHANNELS),
+    .INPUT_SAMPLE_SIZE(INPUT_SAMPLE_SIZE)
   ) header_inserter_inst (
     .clk(clk),
     .rstn(rstn),
@@ -297,11 +440,11 @@ module application_tx #(
     .udp_destination(udp_destination),
     .udp_length(udp_length),
     .udp_checksum(udp_checksum),
-    .input_enable(input_enable_cdc),
-    .packet_size(packet_size),
+    .input_enable(converters(input_enable_cdc)),
+    .sample_count(sample_count),
     .run_packetizer(run_packetizer),
     .packet_sent(packet_sent),
-    .input_axis_tvalid(cdc_axis_tvalid),
+    .input_axis_tvalid(cdc_axis_tvalid_gated),
     .input_axis_tready(cdc_axis_tready),
     .input_axis_tdata(cdc_axis_tdata),
     .packet_tlast(packet_tlast),
@@ -323,11 +466,11 @@ module application_tx #(
 
   util_axis_fifo #(
     .DATA_WIDTH(AXIS_DATA_WIDTH),
-    .ADDRESS_WIDTH($clog2(8192/AXIS_DATA_WIDTH)+1),
+    .ADDRESS_WIDTH($clog2(12288/AXIS_DATA_WIDTH)+1),
     .ASYNC_CLK(0),
     .M_AXIS_REGISTERED(1),
-    .ALMOST_EMPTY_THRESHOLD(8192/AXIS_DATA_WIDTH),
-    .ALMOST_FULL_THRESHOLD(8192/AXIS_DATA_WIDTH),
+    .ALMOST_EMPTY_THRESHOLD(12288/AXIS_DATA_WIDTH),
+    .ALMOST_FULL_THRESHOLD(12288/AXIS_DATA_WIDTH),
     .TLAST_EN(1),
     .TKEEP_EN(1),
     .REMOVE_NULL_BEAT_EN(0)
@@ -342,6 +485,8 @@ module application_tx #(
     .m_axis_level(),
     .m_axis_empty(),
     .m_axis_almost_empty(packet_buffer_almost_empty),
+    .m_axis_full(),
+    .m_axis_almost_full(),
 
     .s_axis_aclk(clk),
     .s_axis_aresetn(packet_fifo_rstn),
@@ -351,6 +496,8 @@ module application_tx #(
     .s_axis_tkeep(packet_axis_tkeep),
     .s_axis_tlast(packet_axis_tlast),
     .s_axis_room(),
+    .s_axis_empty(),
+    .s_axis_almost_empty(),
     .s_axis_full(),
     .s_axis_almost_full(packet_buffer_almost_full));
 
@@ -385,6 +532,8 @@ module application_tx #(
     .m_axis_level(),
     .m_axis_empty(),
     .m_axis_almost_empty(),
+    .m_axis_full(),
+    .m_axis_almost_full(),
 
     .s_axis_aclk(clk),
     .s_axis_aresetn(rstn),
@@ -394,6 +543,8 @@ module application_tx #(
     .s_axis_tkeep(),
     .s_axis_tlast(s_axis_sync_tx_tlast),
     .s_axis_room(),
+    .s_axis_empty(),
+    .s_axis_almost_empty(),
     .s_axis_full(),
     .s_axis_almost_full());
 

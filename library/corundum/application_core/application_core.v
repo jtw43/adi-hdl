@@ -117,6 +117,7 @@ module application_core #
   // Input stream
   parameter INPUT_WIDTH = 2048,
   parameter INPUT_CHANNELS = 4,
+  parameter INPUT_SAMPLE_SIZE = 16,
 
   // Output stream
   parameter OUTPUT_WIDTH = 2048,
@@ -532,6 +533,7 @@ module application_core #
   output wire                                           input_axis_tready,
 
   input  wire [INPUT_CHANNELS-1:0]                      input_enable,
+  output wire                                           input_packer_reset,
 
   // Output data
   input  wire                                           output_clk,
@@ -598,6 +600,9 @@ module application_core #
   wire [16-1:0] udp_length;
   wire [16-1:0] udp_checksum;
 
+  // Sample count per channel
+  wire [15:0] sample_count;
+
   application_tx #(
     .IF_COUNT(IF_COUNT),
     .PORTS_PER_IF(PORTS_PER_IF),
@@ -605,7 +610,8 @@ module application_core #
     .AXIS_KEEP_WIDTH(AXIS_SYNC_KEEP_WIDTH),
     .AXIS_TX_USER_WIDTH(AXIS_SYNC_TX_USER_WIDTH),
     .INPUT_WIDTH(INPUT_WIDTH),
-    .CHANNELS(INPUT_CHANNELS)
+    .CHANNELS(INPUT_CHANNELS),
+    .INPUT_SAMPLE_SIZE(INPUT_SAMPLE_SIZE)
   ) application_tx_inst (
     .clk(clk),
     .rstn(rstn),
@@ -628,9 +634,9 @@ module application_core #
     .input_axis_tvalid(input_axis_tvalid),
     .input_axis_tready(input_axis_tready),
     .input_enable(input_enable),
+    .input_packer_reset(input_packer_reset),
 
     .start_app(start_app),
-    .packet_size(packet_size),
     .ethernet_destination_MAC(ethernet_destination_MAC),
     .ethernet_source_MAC(ethernet_source_MAC),
     .ethernet_type(ethernet_type),
@@ -649,7 +655,9 @@ module application_core #
     .udp_source(udp_source),
     .udp_destination(udp_destination),
     .udp_length(udp_length),
-    .udp_checksum(udp_checksum));
+    .udp_checksum(udp_checksum),
+
+    .sample_count(sample_count));
 
   application_rx #(
     .IF_COUNT(IF_COUNT),
@@ -816,7 +824,9 @@ module application_core #
     .insert_bit_error(insert_bit_error),
     .total_bits(total_bits),
     .error_bits_total(error_bits_total),
-    .out_of_sync_total(out_of_sync_total));
+    .out_of_sync_total(out_of_sync_total),
+
+    .sample_count(sample_count));
 
   ////----------------------------------------Others-----------------//
   //////////////////////////////////////////////////

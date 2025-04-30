@@ -38,7 +38,8 @@
 module packetizer #(
 
   parameter AXIS_DATA_WIDTH = 512,
-  parameter CHANNELS = 4
+  parameter CHANNELS = 4,
+  parameter INPUT_SAMPLE_SIZE = 16
 ) (
 
   input  wire                         clk,
@@ -48,8 +49,8 @@ module packetizer #(
   input  wire                         input_axis_tvalid,
   input  wire                         input_axis_tready,
 
-  input  wire [CHANNELS-1:0]          input_enable,
-  input  wire [15:0]                  packet_size,
+  input  wire [$clog2(CHANNELS):0]    input_enable,
+  input  wire [15:0]                  sample_count,
   output reg                          packet_tlast
 );
 
@@ -57,22 +58,12 @@ module packetizer #(
   reg  [15:0] packet_size_dynamic;
   wire [15:0] packet_size_dynamic_calc;
 
-  function [$clog2(CHANNELS):0] converters(input [CHANNELS-1:0] input_enable);
-    integer i;
-    begin
-      converters = 0;
-      for (i=0; i<CHANNELS; i=i+1) begin
-        converters = converters + input_enable[i];
-      end
-    end
-  endfunction
-
-  assign packet_size_dynamic_calc = (packet_size/AXIS_DATA_WIDTH*8/(2**$clog2(CHANNELS)))*converters(input_enable);
+  assign packet_size_dynamic_calc = sample_count[15:$clog2(AXIS_DATA_WIDTH/INPUT_SAMPLE_SIZE)]*input_enable;
 
   always @(posedge clk)
   begin
     if (!rstn) begin
-      packet_size_dynamic <= packet_size;
+      packet_size_dynamic <= 'd0;
     end else begin
       packet_size_dynamic <= packet_size_dynamic_calc;
     end
