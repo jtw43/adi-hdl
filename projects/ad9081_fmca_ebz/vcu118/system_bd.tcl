@@ -148,14 +148,13 @@ ad_ip_parameter axi_ddr_cntrl CONFIG.C0_CLOCK_BOARD_INTERFACE default_250mhz_clk
 ad_ip_parameter axi_ddr_cntrl CONFIG.C0_DDR4_BOARD_INTERFACE ddr4_sdram_c1_062
 
 set INPUT_CHANNELS $ad_project_params(RX_JESD_M)
-set INPUT_SAMPLES $ad_project_params(RX_JESD_S)
-
-set INPUT_SAMPLE_WIDTH $ad_project_params(RX_JESD_NP)
-if {$INPUT_SAMPLE_WIDTH == 12} {
-  set INPUT_SAMPLE_WIDTH 16
+set INPUT_SAMPLES_PER_CHANNEL $ad_project_params(RX_JESD_S)
+set INPUT_SAMPLE_DATA_WIDTH $ad_project_params(RX_JESD_NP)
+if {$INPUT_SAMPLE_DATA_WIDTH == 12} {
+  set INPUT_SAMPLE_DATA_WIDTH 16
 }
 
-set INPUT_WIDTH [expr $INPUT_CHANNELS*$INPUT_SAMPLES*$INPUT_SAMPLE_WIDTH]
+set INPUT_WIDTH [expr $INPUT_CHANNELS*$INPUT_SAMPLES_PER_CHANNEL*$INPUT_SAMPLE_DATA_WIDTH]
 
 set OUTPUT_CHANNELS $ad_project_params(TX_JESD_M)
 set OUTPUT_SAMPLES $ad_project_params(TX_JESD_S)
@@ -227,8 +226,8 @@ if {$APP_ENABLE == 1} {
 
 ad_ip_instance util_cpack2 util_corundum_cpack [list \
   NUM_OF_CHANNELS $INPUT_CHANNELS \
-  SAMPLES_PER_CHANNEL $INPUT_SAMPLES \
-  SAMPLE_DATA_WIDTH $INPUT_SAMPLE_WIDTH \
+  SAMPLES_PER_CHANNEL $INPUT_SAMPLES_PER_CHANNEL \
+  SAMPLE_DATA_WIDTH $INPUT_SAMPLE_DATA_WIDTH \
 ]
 
 ad_connect util_corundum_cpack/clk rx_device_clk
