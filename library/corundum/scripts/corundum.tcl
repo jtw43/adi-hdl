@@ -354,6 +354,8 @@ if {$APP_ENABLE == 1} {
   create_bd_pin -dir O input_axis_tready
   create_bd_pin -dir I -from [expr {$INPUT_WIDTH-1}] -to 0 input_axis_tdata
 
+  create_bd_pin -dir O -type intr input_packer_reset
+
   create_bd_pin -dir O output_axis_tvalid
   create_bd_pin -dir I output_axis_tready
   create_bd_pin -dir O -from [expr {$OUTPUT_WIDTH-1}] -to 0 output_axis_tdata
@@ -383,6 +385,8 @@ if {$APP_ENABLE == 1} {
   ad_connect application_core/input_axis_tvalid input_axis_tvalid
   ad_connect application_core/input_axis_tdata input_axis_tdata
   ad_connect application_core/input_axis_tready input_axis_tready
+
+  ad_connect application_core/input_packer_reset input_packer_reset
 
   ad_connect application_core/output_axis_tvalid output_axis_tvalid
   ad_connect application_core/output_axis_tdata output_axis_tdata

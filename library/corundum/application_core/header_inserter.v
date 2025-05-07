@@ -131,7 +131,7 @@ module header_inserter #(
     if (!rstn) begin
       udp_length <= 16'd0;
     end else begin
-      udp_length <= 16'h8 + sample_count*SAMPLE_DATA_WIDTH*input_enable;
+      udp_length <= 16'h8 + sample_count*input_enable*SAMPLE_DATA_WIDTH/8;
     end
   end
 
