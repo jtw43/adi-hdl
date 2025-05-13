@@ -92,9 +92,11 @@ set_property -dict [list \
 
 # if TWOLANES=0, disable and tie to GND, ports db_p, db_n
 adi_set_ports_dependency "db_p" \
-  "(spirit:decode(id('MODELPARAM_VALUE.TWOLANES')) == 0)"
+  "(spirit:decode(id('MODELPARAM_VALUE.TWOLANES')) == 1)"
 adi_set_ports_dependency "db_n" \
-  "(spirit:decode(id('MODELPARAM_VALUE.TWOLANES')) == 0)"
+  "(spirit:decode(id('MODELPARAM_VALUE.TWOLANES')) == 1)"
+
+set_property driver_value 0 [ipx::get_ports -filter "direction==in" -of_objects $cc]
 
 #adi_add_auto_fpga_spec_params
 
