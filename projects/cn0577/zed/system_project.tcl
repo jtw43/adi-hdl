@@ -11,16 +11,11 @@ source $ad_hdl_dir/projects/scripts/adi_board.tcl
 # if the TWOLANES parameter is not defined, by default it will use TWOLANES=1
 
 # configuration mode: one-lane (0) or two-lane (1)
-set TWOLANES 1
 
-if [info exists ::env(TWOLANES)] {
-  set TWOLANES $::env(TWOLANES)
-} else {
-  set env(TWOLANES) $TWOLANES
-}
+set TWOLANES [get_env_param TWOLANES 1]
 
 adi_project cn0577_zed 0 [list \
-  TWOLANES      $TWOLANES \
+  TWOLANES [get_env_param TWOLANES 1 ] \
 ]
 
 adi_project_files cn0577_zed [list \

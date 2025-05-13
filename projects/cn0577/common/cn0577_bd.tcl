@@ -16,10 +16,8 @@ create_bd_port -dir I dco_n
 create_bd_port -dir O cnv
 create_bd_port -dir I da_p
 create_bd_port -dir I da_n
-
 create_bd_port -dir I db_p
 create_bd_port -dir I db_n
-
 create_bd_port -dir O clk_gate
 
 # adc peripheral
@@ -65,7 +63,8 @@ ad_connect dco_p      axi_ltc2387/dco_p
 ad_connect dco_n      axi_ltc2387/dco_n
 ad_connect da_p       axi_ltc2387/da_p
 ad_connect da_n       axi_ltc2387/da_n
-if {$TWOLANES == "1"} {
+
+if {$TWOLANES == 1} {
   ad_connect db_p       axi_ltc2387/db_p
   ad_connect db_n       axi_ltc2387/db_n
 }
