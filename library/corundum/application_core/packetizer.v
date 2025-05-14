@@ -48,8 +48,10 @@ module packetizer #(
   // input
   input  wire                         input_axis_tvalid,
   input  wire                         input_axis_tready,
-
   input  wire [$clog2(CHANNELS):0]    input_enable,
+
+  input  wire                         output_axis_tready,
+
   input  wire [15:0]                  sample_count,
   output reg                          packet_tlast
 );
@@ -58,7 +60,7 @@ module packetizer #(
   reg  [15:0] packet_size_dynamic;
   wire [15:0] packet_size_dynamic_calc;
 
-  assign packet_size_dynamic_calc = sample_count[15:$clog2(AXIS_DATA_WIDTH/SAMPLE_DATA_WIDTH)]*input_enable;
+  assign packet_size_dynamic_calc = sample_count * input_enable / (AXIS_DATA_WIDTH/SAMPLE_DATA_WIDTH);
 
   always @(posedge clk)
   begin
@@ -83,7 +85,9 @@ module packetizer #(
           packet_tlast <= 1'b1;
         end
       end else begin
-        packet_tlast <= 1'b0;
+        if (output_axis_tready) begin
+          packet_tlast <= 1'b0;
+        end
       end
     end
   end

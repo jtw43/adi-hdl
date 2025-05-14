@@ -240,8 +240,8 @@ module application_tx #(
     end
   end
 
-  assign input_count_requested = input_sample_total_requested[15:$clog2(INPUT_WIDTH/SAMPLE_DATA_WIDTH)] +
-    ((INPUT_WIDTH > AXIS_DATA_WIDTH) ? ((input_sample_total_requested[$clog2(INPUT_WIDTH/SAMPLE_DATA_WIDTH)-1:0] != 'd0) ? 1 : 0) : 0);
+  assign input_count_requested = input_sample_total_requested / (INPUT_WIDTH/SAMPLE_DATA_WIDTH) +
+    ((INPUT_WIDTH > AXIS_DATA_WIDTH) ? ((input_sample_total_requested % (INPUT_WIDTH/SAMPLE_DATA_WIDTH) != 'd0) ? 1 : 0) : 0);
 
   wire input_axis_tvalid_buffered;
 
@@ -292,14 +292,12 @@ module application_tx #(
     if (!rstn) begin
       output_count_requested <= 16'h0;
     end else begin
-      output_count_requested <= converters(input_enable_cdc) * sample_count[15:$clog2(AXIS_DATA_WIDTH/SAMPLE_DATA_WIDTH)];
+      output_count_requested <= converters(input_enable_cdc) * sample_count / (AXIS_DATA_WIDTH/SAMPLE_DATA_WIDTH);
     end
   end
 
-  assign output_count_requested_max = (INPUT_WIDTH > AXIS_DATA_WIDTH) ?
-    output_count_requested[15:$clog2(INPUT_WIDTH/AXIS_DATA_WIDTH)] +
-      ((output_count_requested[$clog2(INPUT_WIDTH/AXIS_DATA_WIDTH)-1:0] == 0) ? 'd0 : INPUT_WIDTH/AXIS_DATA_WIDTH) :
-    output_count_requested;
+  assign output_count_requested_max = output_count_requested +
+    ((INPUT_WIDTH > AXIS_DATA_WIDTH) ? ((output_count_requested % (INPUT_WIDTH/AXIS_DATA_WIDTH) != 'd0) ? ((INPUT_WIDTH/AXIS_DATA_WIDTH) - output_count_requested % (INPUT_WIDTH/AXIS_DATA_WIDTH)) : 0) : 0);
 
   wire [AXIS_DATA_WIDTH-1:0] cdc_axis_tdata;
   wire                       cdc_axis_tvalid;
@@ -312,7 +310,7 @@ module application_tx #(
     if (!rstn) begin
       output_counter <= 'd1;
     end else begin
-      if (output_counter == output_count_requested_max) begin
+      if (output_counter >= output_count_requested_max) begin
         output_counter <= 'd1;
       end else begin
         if (cdc_axis_tvalid && cdc_axis_tready) begin
@@ -330,7 +328,7 @@ module application_tx #(
       if (output_counter >= output_count_requested_max) begin
         output_sent <= 1'b0;
       end else begin
-        if (output_counter == output_count_requested) begin
+        if (cdc_axis_tvalid && cdc_axis_tready && output_counter >= output_count_requested) begin
           output_sent <= 1'b1;
         end
       end
@@ -346,11 +344,11 @@ module application_tx #(
   util_axis_fifo_asym #(
     .ASYNC_CLK(1),
     .S_DATA_WIDTH(INPUT_WIDTH),
-    .ADDRESS_WIDTH($clog2(12288/INPUT_WIDTH)+1),
+    .ADDRESS_WIDTH($clog2(2**13 * 8 / INPUT_WIDTH)+1),
     .M_DATA_WIDTH(AXIS_DATA_WIDTH),
     .M_AXIS_REGISTERED(1),
-    .ALMOST_EMPTY_THRESHOLD(12288/INPUT_WIDTH),
-    .ALMOST_FULL_THRESHOLD(12288/INPUT_WIDTH),
+    .ALMOST_EMPTY_THRESHOLD(4096/INPUT_WIDTH),
+    .ALMOST_FULL_THRESHOLD($clog2(2**13 * 8 / INPUT_WIDTH)),
     .TLAST_EN(0),
     .TKEEP_EN(0),
     .FIFO_LIMITED(0),
@@ -385,6 +383,12 @@ module application_tx #(
   ////----------------------------------------Packetizer--------------------//
   //////////////////////////////////////////////////
 
+  wire                       packet_axis_tready;
+  wire                       packet_axis_tvalid;
+  wire [AXIS_DATA_WIDTH-1:0] packet_axis_tdata;
+  wire [AXIS_KEEP_WIDTH-1:0] packet_axis_tkeep;
+  wire                       packet_axis_tlast;
+
   packetizer #(
     .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH),
     .CHANNELS(CHANNELS),
@@ -395,17 +399,12 @@ module application_tx #(
     .input_axis_tvalid(cdc_axis_tvalid_gated),
     .input_axis_tready(cdc_axis_tready),
     .input_enable(converters(input_enable_cdc)),
+    .output_axis_tready(packet_axis_tready),
     .sample_count(sample_count),
     .packet_tlast(packet_tlast));
 
   ////----------------------------------------Header Inserter---------------//
   //////////////////////////////////////////////////
-
-  wire                       packet_axis_tready;
-  wire                       packet_axis_tvalid;
-  wire [AXIS_DATA_WIDTH-1:0] packet_axis_tdata;
-  wire [AXIS_KEEP_WIDTH-1:0] packet_axis_tkeep;
-  wire                       packet_axis_tlast;
 
   wire                       packet_buffer_axis_tvalid;
   reg                        packet_buffer_axis_tready;
@@ -469,11 +468,11 @@ module application_tx #(
 
   util_axis_fifo #(
     .DATA_WIDTH(AXIS_DATA_WIDTH),
-    .ADDRESS_WIDTH($clog2(12288/AXIS_DATA_WIDTH)+1),
+    .ADDRESS_WIDTH($clog2(2**13 * 8 / AXIS_DATA_WIDTH)),
     .ASYNC_CLK(0),
     .M_AXIS_REGISTERED(1),
-    .ALMOST_EMPTY_THRESHOLD(12288/AXIS_DATA_WIDTH),
-    .ALMOST_FULL_THRESHOLD(12288/AXIS_DATA_WIDTH),
+    .ALMOST_EMPTY_THRESHOLD(8192/INPUT_WIDTH),
+    .ALMOST_FULL_THRESHOLD(8192/INPUT_WIDTH),
     .TLAST_EN(1),
     .TKEEP_EN(1),
     .REMOVE_NULL_BEAT_EN(0)
@@ -558,13 +557,14 @@ module application_tx #(
   always @(posedge clk)
   begin
     if (!rstn) begin
-      datapath_switch <= 1'b0;
+      datapath_switch <= 1'b1;
     end else begin
-      if ((packet_buffer_almost_empty || !run_packetizer) && (packet_buffer_axis_tready && packet_buffer_axis_tvalid && packet_buffer_axis_tlast) || !packet_fifo_rstn) begin
-        datapath_switch <= 1'b0;
-      end else if (packet_buffer_almost_full && (!os_buffer_axis_tvalid || (os_buffer_axis_tready && os_buffer_axis_tvalid && os_buffer_axis_tlast))) begin
-        datapath_switch <= 1'b1;
-      end
+      datapath_switch <= 1'b1;
+      // if ((packet_buffer_almost_empty || os_buffer_axis_tvalid || !run_packetizer) && (packet_buffer_axis_tready && packet_buffer_axis_tvalid && packet_buffer_axis_tlast) || !packet_fifo_rstn) begin
+      //   datapath_switch <= 1'b0;
+      // end else if (packet_buffer_almost_full && (!os_buffer_axis_tvalid || (os_buffer_axis_tready && os_buffer_axis_tvalid && os_buffer_axis_tlast))) begin
+      //   datapath_switch <= 1'b1;
+      // end
     end
   end
 
