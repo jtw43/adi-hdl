@@ -1,11 +1,16 @@
 ###############################################################################
-## Copyright (C) 2022-2024 Analog Devices, Inc. All rights reserved.
+## Copyright (C) 2022-2025 Analog Devices, Inc. All rights reserved.
 ### SPDX short identifier: ADIBSD
 ###############################################################################
 
 set TWOLANES $ad_project_params(TWOLANES)
+set RESOLUTION_16_18N $ad_project_params(RESOLUTION_16_18N)
 
-puts "build parameter value = $TWOLANES"
+puts "build parameter value TWOLANES = $TWOLANES"
+puts "build parameter value RESOLUTION_16_18N = $RESOLUTION_16_18N"
+
+set ADC_RES [expr {$RESOLUTION_16_18N == 1 ? 16 : 18}]
+set OUT_RES [expr {$RESOLUTION_16_18N == 1 ? 16 : 32}]
 
 # ltc2387 i/o
 
@@ -23,8 +28,8 @@ create_bd_port -dir O clk_gate
 # adc peripheral
 
 ad_ip_instance axi_ltc2387 axi_ltc2387
-ad_ip_parameter axi_ltc2387 CONFIG.ADC_RES 18
-ad_ip_parameter axi_ltc2387 CONFIG.OUT_RES 32
+ad_ip_parameter axi_ltc2387 CONFIG.ADC_RES $ADC_RES
+ad_ip_parameter axi_ltc2387 CONFIG.OUT_RES $OUT_RES
 ad_ip_parameter axi_ltc2387 CONFIG.TWOLANES $TWOLANES
 ad_ip_parameter axi_ltc2387 CONFIG.ADC_INIT_DELAY 27
 
@@ -48,7 +53,7 @@ ad_ip_parameter axi_ltc2387_dma CONFIG.SYNC_TRANSFER_START 0
 ad_ip_parameter axi_ltc2387_dma CONFIG.AXI_SLICE_SRC 0
 ad_ip_parameter axi_ltc2387_dma CONFIG.AXI_SLICE_DEST 0
 ad_ip_parameter axi_ltc2387_dma CONFIG.DMA_2D_TRANSFER 0
-ad_ip_parameter axi_ltc2387_dma CONFIG.DMA_DATA_WIDTH_SRC 32
+ad_ip_parameter axi_ltc2387_dma CONFIG.DMA_DATA_WIDTH_SRC $OUT_RES
 ad_ip_parameter axi_ltc2387_dma CONFIG.DMA_DATA_WIDTH_DEST 64
 
 # connections
