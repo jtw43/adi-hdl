@@ -10,11 +10,16 @@ global VIVADO_IP_LIBRARY
 
 adi_ip_create ethernet
 
-set_property part xcvu9p-flga2104-2L-e [current_project]
-
 if [info exists ::env(BOARD)] {
   set board $::env(BOARD)
   if [string equal $board VCU118] {
+    set_property part xcvu9p-flga2104-2L-e [current_project]
+
+    source "$ad_hdl_dir/../corundum/fpga/mqnic/VCU118/fpga_100g/ip/cmac_usplus.tcl"
+    source "$ad_hdl_dir/../corundum/fpga/mqnic/VCU118/fpga_100g/ip/cmac_gty.tcl"
+  } elseif [string equal $board XCVU11P] {
+    set_property part xcvu11p-flgb2104-2-i [current_project]
+
     source "$ad_hdl_dir/../corundum/fpga/mqnic/VCU118/fpga_100g/ip/cmac_usplus.tcl"
     source "$ad_hdl_dir/../corundum/fpga/mqnic/VCU118/fpga_100g/ip/cmac_gty.tcl"
   } else {
