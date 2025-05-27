@@ -66,7 +66,12 @@ set_max_delay -datapath_only \
   -to [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_bits_sample_count/cdc_sync_stage1_reg* && IS_SEQUENTIAL}] \
   [get_property -min PERIOD $corundum_clk]
 
-# gray coding constraints
+set_max_delay -datapath_only \
+  -from $corundum_clk \
+  -to [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_bits_packet_generated/cdc_sync_stage1_reg* && IS_SEQUENTIAL}] \
+  [get_property -min PERIOD $corundum_clk]
+
+# gray counter constraints
 
 set_max_delay -datapath_only \
   -from $input_clk \
@@ -101,7 +106,7 @@ set_max_delay -datapath_only \
   -to [get_cells -hier -filter {NAME =~ *application_rx_inst/rx_arbiter_inst/output_enable_cdc* && IS_SEQUENTIAL}] \
   [get_property -min PERIOD $output_clk]
 
-# gray coding constraints
+# gray counter constraints
 
 set_max_delay -datapath_only \
   -from $corundum_clk \
