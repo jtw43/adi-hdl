@@ -35,6 +35,8 @@
 `timescale 1ns / 1ps
 
 module axi_gpio_adi #(
+  
+  output      reg         irq,
   //axi interface
   input                   s_axi_aclk,
   input                   s_axi_aresetn,
@@ -58,12 +60,27 @@ module axi_gpio_adi #(
   output      [31:0]      s_axi_rdata,
   input                   s_axi_rready,
   
-  output reg  [3:0]   	  gpio_leds,
-  input  wire [3:0]       gpio_buttons
+  output      [3:0]   	  gpio_out, // for LEDs
+  input       [3:0]       gpio_in   // for buttons
 );
-  reg           up_resetn = 1'b0;
-  wire          up_clk;
+  reg                     up_resetn = 1'b0;
+  
+  //IRQ
+  reg         [3:0]      up_irq_mask = 4'b1111;
+  reg         [3:0]      up_irq_source = 4'h0;
+  wire        [3:0]      up_irq_pending;
+  wire        [3:0]      up_irq_trigger;
+  wire        [3:0]      up_irq_source_clear;
+  
+  //CLK
+  wire                   up_clk;
   assign up_clk = s_axi_aclk;
+
+  //IRQ handling
+  assign up_irq_pending = ~up_irq_mask & up_irq_source;
+  assign up_irq_trigger  = {1'b0, 1'b0, led_blink, 1'b0}; 
+  assign up_irq_source_clear = (up_wreq_s == 1'b1 && up_waddr_s == 8'h11) ? up_wdata_s[3:0] : 4'b0000;
+
 
   up_axi #(
     .AXI_ADDRESS_WIDTH(10)
@@ -96,19 +113,7 @@ module axi_gpio_adi #(
     .up_rdata (up_rdata),
     .up_rack (up_rack));
 
-  reg [3:0] gpio_leds_reg;
-//axi registers write
-  assign gpio_leds = gpio_leds_reg;
-  always @(posedge up_clk) begin
-	if (up_resetn == 1'b1) begin
-		if ((up_wreq_s == 1'b1) && (up_waddr_s == 8'h02)) begin
-			gpio_leds <= up_wdata_s[3:0]; 
-		end
-		if ((up_wreq_s == 1'b1) && (up_waddr_s == 8'h21)) begin
-			gpio_buttons <= up_wdata_s[3:0];  
-		end
-	
- //writing reset
+  //writing reset
   always @(posedge up_clk) begin
     if (s_axi_aresetn == 1'b0) begin
       up_wack <= 'd0;
@@ -117,11 +122,27 @@ module axi_gpio_adi #(
       up_wack <= up_wreq_s;
       if ((up_wreq_s == 1'b1) && (up_waddr_s == 8'h20)) begin
         up_resetn <= up_wdata_s[0];
-      end else begin
-        up_resetn <= 1'd1;
       end
     end
   end
+
+  //axi registers write
+  always @(posedge up_clk) begin
+	if (up_resetn == 1'b1) begin
+		if ((up_wreq_s == 1'b1) && (up_waddr_s == 8'h21)) begin
+			gpio_out <= up_wdata_s[3:0]; 
+		end
+	end
+  end
+
+  //mask
+  always @(posedge up_clk) begin
+  if (up_resetn == 1'b0)
+    up_irq_mask <= 4'b1111;
+  else if ((up_wreq_s == 1'b1) && (up_waddr_s == 8'h23))
+    up_irq_mask <= up_wdata_s[3:0];
+  end
+
 
   //axi registers read
   always @(posedge up_clk) begin
@@ -132,8 +153,8 @@ module axi_gpio_adi #(
       up_rack <= up_rreq_s;
       if (up_rreq_s == 1'b1) begin
         case (up_raddr_s)
-          8'h00: up_rdata <= gpio_leds_reg;
-          8'h04: up_rdata <= gpio_buttons;
+          8'h21: up_rdata <= gpio_out;
+          8'h22: up_rdata <= gpio_in;
           default: up_rdata <= 0;
         endcase
       end else begin
@@ -141,5 +162,64 @@ module axi_gpio_adi #(
       end
     end
   end
+  
+  //led_blink
+  wire button_input = gpio_in[0];
+  reg  button_d1;
 
+  always @(posedge up_clk) begin
+    if (up_resetn == 1'b0)
+      button_d1 <= 1'b0;
+    else
+      button_d1 <= button_input;
+  end
+
+  assign led_blink = button_input & ~button_d1; // rising edge pulse
+
+  //IRQ handling
+  always @(posedge up_clk) begin
+    if (up_resetn == 1'b0) begin
+      irq <= 1'b0;
+    end else begin
+      irq <= |up_irq_pending;
+    end
+  end
+
+  always @(posedge up_clk) begin
+    if (up_resetn == 1'b0) begin
+      up_irq_source <= 4'b0000;
+    end else begin
+      up_irq_source <= up_irq_trigger | (up_irq_source & ~up_irq_source_clear);
+    end
+  end
+
+  //led_blink
+  reg [3:0] irq_source_d1;
+  reg       led_state;
+
+
+  always @(posedge up_clk) begin
+    if (up_resetn == 1'b0) begin
+      irq_source_d1 <= 4'b0000;
+      led_state     <= 1'b0;
+    end else begin
+      irq_source_d1 <= up_irq_source;
+     
+      if ((up_irq_source[2] == 1'b1) && (irq_source_d1[2] == 1'b0)) begin
+        led_state <= ~led_state;
+      end
+    end
+  end
+
+  assign gpio_out[0] = led_state;
+
+  always @(posedge up_clk) begin
+    if (up_resetn == 1'b0) begin
+      gpio_out <= 4'b0000;
+    end else if ((up_wreq_s == 1'b1) && (up_waddr_s == 8'h21)) begin
+      gpio_out <= up_wdata_s[3:0]; 
+    end
+  end
+ 
+ 
 endmodule
