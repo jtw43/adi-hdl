@@ -122,29 +122,17 @@ module ber_tester_tx #(
 
   endgenerate
 
-  // insert_bit_error CDC
-  wire insert_bit_error_cdc;
-
-  sync_bits #(
-    .NUM_OF_BITS(1)
-  ) sync_bits_insert_bit_error (
-    .in_bits(insert_bit_error),
-    .out_resetn(direct_tx_rstn),
-    .out_clk(direct_tx_clk),
-    .out_bits(insert_bit_error_cdc)
-  );
-
-  reg insert_bit_error_cdc_old;
+  reg insert_bit_error_old;
   reg insert_bit_error_valid;
 
   always @(posedge direct_tx_clk)
   begin
     if (!direct_tx_rstn) begin
-      insert_bit_error_cdc_old <= 1'b0;
+      insert_bit_error_old <= 1'b0;
       insert_bit_error_valid <= 1'b0;
     end else begin
-      insert_bit_error_cdc_old <= insert_bit_error_cdc;
-      if (!insert_bit_error_cdc_old && insert_bit_error_cdc) begin
+      insert_bit_error_old <= insert_bit_error;
+      if (!insert_bit_error_old && insert_bit_error) begin
         insert_bit_error_valid <= 1'b1;
       end else begin
         if (prbs_ready && prbs_valid[0]) begin

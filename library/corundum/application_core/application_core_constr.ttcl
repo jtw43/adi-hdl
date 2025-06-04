@@ -27,6 +27,13 @@ set output_clk [get_clocks -of_objects [get_ports $output_clk_ports_base]]
 set direct_tx_clk [get_clocks -of_objects [get_ports $direct_tx_clk_port_base]]
 set direct_rx_clk [get_clocks -of_objects [get_ports $direct_rx_clk_port_base]]
 
+# base clocks period
+set corundum_clk_period [get_property -min PERIOD $corundum_clk]
+set input_clk_period [get_property -min PERIOD $input_clk]
+set output_clk_period [get_property -min PERIOD $output_clk]
+set direct_tx_clk_period [get_property -min PERIOD $direct_tx_clk]
+set direct_rx_clk_period [get_property -min PERIOD $direct_rx_clk]
+
 # set the groups in usable ports groups with the base
 set corundum_input_clk_port "$corundum_clk_ports_base $input_clk_ports_base"
 set corundum_output_clk_port "$corundum_clk_ports_base $input_clk_ports_base"
@@ -39,6 +46,12 @@ set corundum_output_clk [get_clocks -of_objects [get_ports $corundum_output_clk_
 set corundum_direct_tx_clk [get_clocks -of_objects [get_ports $corundum_direct_tx_clk_port]]
 set corundum_direct_rx_clk [get_clocks -of_objects [get_ports $corundum_direct_rx_clk_port]]
 
+# clock group's minimum periods
+set corundum_input_clk_period [get_property -min PERIOD $corundum_input_clk]
+set corundum_output_clk_period [get_property -min PERIOD $corundum_output_clk]
+set corundum_direct_tx_clk_period [get_property -min PERIOD $corundum_direct_tx_clk]
+set corundum_direct_rx_clk_period [get_property -min PERIOD $corundum_direct_rx_clk]
+
 ###########################################
 # constraints
 ###########################################
@@ -46,113 +59,202 @@ set corundum_direct_rx_clk [get_clocks -of_objects [get_ports $corundum_direct_r
 # application TX side
 ###########################################
 
-# false paths
+# run packetizer
 
 set_false_path \
-  -to [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_bits_run_packetizer/cdc_sync_stage1_reg* && IS_SEQUENTIAL}]
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/run_packetizer_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_bits_run_packetizer/cdc_sync_stage1_reg[0]}]]
 
-set_false_path \
-  -to [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_bits_input_enable_ff/cdc_sync_stage1_reg* && IS_SEQUENTIAL}]
-
-# max delay
+# input enable
 
 set_max_delay -datapath_only \
-  -from $input_clk \
-  -to [get_cells -hier -filter {NAME =~ *application_tx_inst/input_enable_cdc* && IS_SEQUENTIAL}] \
-  [get_property -min PERIOD $input_clk]
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_data_input_enable/in_toggle_d1_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_data_input_enable/i_sync_out/cdc_sync_stage1_reg[0]}]] \
+  $input_clk_period
 
 set_max_delay -datapath_only \
-  -from $corundum_clk \
-  -to [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_bits_sample_count/cdc_sync_stage1_reg* && IS_SEQUENTIAL}] \
-  [get_property -min PERIOD $corundum_clk]
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_data_input_enable/out_toggle_d1_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_data_input_enable/i_sync_in/cdc_sync_stage1_reg[0]}]] \
+  $corundum_clk_period
 
 set_max_delay -datapath_only \
-  -from $corundum_clk \
-  -to [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_bits_packet_generated/cdc_sync_stage1_reg* && IS_SEQUENTIAL}] \
-  [get_property -min PERIOD $corundum_clk]
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_data_input_enable/cdc_hold_reg[*]}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_data_input_enable/out_data_reg[*]}]] \
+  $input_clk_period
+
+# sample count
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_data_sample_count/in_toggle_d1_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_data_sample_count/i_sync_out/cdc_sync_stage1_reg[0]}]] \
+  $corundum_clk_period
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_data_sample_count/out_toggle_d1_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_data_sample_count/i_sync_in/cdc_sync_stage1_reg[0]}]] \
+  $input_clk_period
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_data_sample_count/cdc_hold_reg[*]}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_data_sample_count/out_data_reg[*]}]] \
+  $corundum_clk_period
+
+# packet generated
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/packet_generated_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/sync_bits_packet_generated/cdc_sync_stage1_reg[0]}]] \
+  $corundum_clk_period
 
 # gray counter constraints
 
 set_max_delay -datapath_only \
-  -from $input_clk \
-  -to [get_cells -hier -filter {NAME =~ *application_tx_inst/*cdc_scale_fifo/*i_waddr_sync_gray/cdc_sync_stage1_reg* && IS_SEQUENTIAL}] \
-  [get_property -min PERIOD $input_clk]
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/*cdc_scale_fifo/*i_waddr_sync_gray/cdc_sync_stage0_reg[*]}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/*cdc_scale_fifo/*i_waddr_sync_gray/cdc_sync_stage1_reg[*]}]] \
+  $input_clk_period
 set_bus_skew \
-  -from [get_cells -hier -filter {NAME =~ *application_tx_inst/*cdc_scale_fifo/*i_waddr_sync_gray/cdc_sync_stage0_reg* && IS_SEQUENTIAL}] \
-  -to [get_cells -hier -filter {NAME =~ *application_tx_inst/*cdc_scale_fifo/*i_waddr_sync_gray/cdc_sync_stage1_reg* && IS_SEQUENTIAL}] \
-  [get_property -min PERIOD $corundum_input_clk]
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/*cdc_scale_fifo/*i_waddr_sync_gray/cdc_sync_stage0_reg[*]}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/*cdc_scale_fifo/*i_waddr_sync_gray/cdc_sync_stage1_reg[*]}]] \
+  $corundum_input_clk_period
 
 set_max_delay -datapath_only \
-  -from $corundum_clk \
-  -to [get_cells -hier -filter {NAME =~ *application_tx_inst/*cdc_scale_fifo/*i_raddr_sync_gray/cdc_sync_stage1_reg* && IS_SEQUENTIAL}] \
-  [get_property -min PERIOD $corundum_clk]
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/*cdc_scale_fifo/*i_raddr_sync_gray/cdc_sync_stage0_reg[*]}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/*cdc_scale_fifo/*i_raddr_sync_gray/cdc_sync_stage1_reg[*]}]] \
+  $corundum_clk_period
 set_bus_skew \
-  -from [get_cells -hier -filter {NAME =~ *application_tx_inst/*cdc_scale_fifo/*i_raddr_sync_gray/cdc_sync_stage0_reg* && IS_SEQUENTIAL}] \
-  -to [get_cells -hier -filter {NAME =~ *application_tx_inst/*cdc_scale_fifo/*i_raddr_sync_gray/cdc_sync_stage1_reg* && IS_SEQUENTIAL}] \
-  [get_property -min PERIOD $corundum_input_clk]
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/*cdc_scale_fifo/*i_raddr_sync_gray/cdc_sync_stage0_reg[*]}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_tx_inst/*cdc_scale_fifo/*i_raddr_sync_gray/cdc_sync_stage1_reg[*]}]] \
+  $corundum_input_clk_period
 
-# application RX side
-###########################################
+application RX side
+##########################################
 
-# false paths
-
-set_false_path \
-  -to [get_cells -hier -filter {NAME =~ *application_rx_inst/rx_arbiter_inst/sync_bits_output_enable_ff/cdc_sync_stage1_reg* && IS_SEQUENTIAL}]
-
-# max delay
+# output enable
 
 set_max_delay -datapath_only \
-  -from $output_clk \
-  -to [get_cells -hier -filter {NAME =~ *application_rx_inst/rx_arbiter_inst/output_enable_cdc* && IS_SEQUENTIAL}] \
-  [get_property -min PERIOD $output_clk]
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_rx_inst/rx_arbiter_inst/sync_data_output_enable/in_toggle_d1_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_rx_inst/rx_arbiter_inst/sync_data_output_enable/i_sync_out/cdc_sync_stage1_reg[0]}]] \
+  $output_clk_period
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_rx_inst/rx_arbiter_inst/sync_data_output_enable/out_toggle_d1_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_rx_inst/rx_arbiter_inst/sync_data_output_enable/i_sync_in/cdc_sync_stage1_reg[0]}]] \
+  $corundum_clk_period
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_rx_inst/rx_arbiter_inst/sync_data_output_enable/cdc_hold_reg[*]}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_rx_inst/rx_arbiter_inst/sync_data_output_enable/out_data_reg[*]}]] \
+  $output_clk_period
 
 # gray counter constraints
 
 set_max_delay -datapath_only \
-  -from $corundum_clk \
-  -to [get_cells -hier -filter {NAME =~ *application_rx_inst/*cdc_scale_fifo/*i_waddr_sync_gray/cdc_sync_stage1_reg* && IS_SEQUENTIAL}] \
-  [get_property -min PERIOD $corundum_clk]
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_rx_inst/*cdc_scale_fifo/*i_waddr_sync_gray/cdc_sync_stage0_reg[*]}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_rx_inst/*cdc_scale_fifo/*i_waddr_sync_gray/cdc_sync_stage1_reg[*]}]] \
+  $corundum_clk_period
 set_bus_skew \
-  -from [get_cells -hier -filter {NAME =~ *application_rx_inst/*cdc_scale_fifo/*i_waddr_sync_gray/cdc_sync_stage0_reg* && IS_SEQUENTIAL}] \
-  -to [get_cells -hier -filter {NAME =~ *application_rx_inst/*cdc_scale_fifo/*i_waddr_sync_gray/cdc_sync_stage1_reg* && IS_SEQUENTIAL}] \
-  [get_property -min PERIOD $corundum_output_clk]
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_rx_inst/*cdc_scale_fifo/*i_waddr_sync_gray/cdc_sync_stage0_reg[*]}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_rx_inst/*cdc_scale_fifo/*i_waddr_sync_gray/cdc_sync_stage1_reg[*]}]] \
+  $corundum_output_clk_period
 
 set_max_delay -datapath_only \
-  -from $output_clk \
-  -to [get_cells -hier -filter {NAME =~ *application_rx_inst/*cdc_scale_fifo/*i_raddr_sync_gray/cdc_sync_stage1_reg* && IS_SEQUENTIAL}] \
-  [get_property -min PERIOD $output_clk]
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_rx_inst/*cdc_scale_fifo/*i_raddr_sync_gray/cdc_sync_stage0_reg[*]}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_rx_inst/*cdc_scale_fifo/*i_raddr_sync_gray/cdc_sync_stage1_reg[*]}]] \
+  $output_clk_period
 set_bus_skew \
-  -from [get_cells -hier -filter {NAME =~ *application_rx_inst/*cdc_scale_fifo/*i_raddr_sync_gray/cdc_sync_stage0_reg* && IS_SEQUENTIAL}] \
-  -to [get_cells -hier -filter {NAME =~ *application_rx_inst/*cdc_scale_fifo/*i_raddr_sync_gray/cdc_sync_stage1_reg* && IS_SEQUENTIAL}] \
-  [get_property -min PERIOD $corundum_output_clk]
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *application_rx_inst/*cdc_scale_fifo/*i_raddr_sync_gray/cdc_sync_stage0_reg[*]}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *application_rx_inst/*cdc_scale_fifo/*i_raddr_sync_gray/cdc_sync_stage1_reg[*]}]] \
+  $corundum_output_clk_period
 
-# BER testing
-###########################################
+BER testing
+##########################################
 
-# false paths
-
-set_false_path \
-  -to [get_cells -hier -filter {NAME =~ *sync_bits_reset_ber/cdc_sync_stage1_reg* && IS_SEQUENTIAL}]
+# ber test
 
 set_false_path \
-  -to [get_cells -hier -filter {NAME =~ *sync_bits_ber_test/cdc_sync_stage1_reg* && IS_SEQUENTIAL}]
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *sync_bits_ber_test/cdc_sync_stage1_reg[0]}]]
 
-set_false_path \
-  -to [get_cells -hier -filter {NAME =~ *sync_bits_insert_bit_error/cdc_sync_stage1_reg* && IS_SEQUENTIAL}]
-
-# max delay
+# reset ber
 
 set_max_delay -datapath_only \
-  -from $direct_rx_clk \
-  -to [get_cells -hier -filter {NAME =~ *sync_bits_total_bits/cdc_sync_stage1_reg* && IS_SEQUENTIAL}] \
-  [get_property -min PERIOD $direct_rx_clk]
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *sync_event_reset_ber/in_toggle_d1_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *sync_event_reset_ber/i_sync_out/cdc_sync_stage1_reg[0]}]] \
+  $corundum_clk_period
 
 set_max_delay -datapath_only \
-  -from $direct_rx_clk \
-  -to [get_cells -hier -filter {NAME =~ *sync_bits_error_bits_total/cdc_sync_stage1_reg* && IS_SEQUENTIAL}] \
-  [get_property -min PERIOD $direct_rx_clk]
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *sync_event_reset_ber/out_toggle_d1_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *sync_event_reset_ber/i_sync_in/cdc_sync_stage1_reg[0]}]] \
+  $direct_rx_clk_period
 
 set_max_delay -datapath_only \
-  -from $direct_rx_clk \
-  -to [get_cells -hier -filter {NAME =~ *sync_bits_out_of_sync_total/cdc_sync_stage1_reg* && IS_SEQUENTIAL}] \
-  [get_property -min PERIOD $direct_rx_clk]
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *sync_event_reset_ber/cdc_hold_reg[0]}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *sync_event_reset_ber/out_event_reg[0]}]] \
+  $corundum_clk_period
+
+# insert bit error
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *sync_event_insert_bit_error/in_toggle_d1_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *sync_event_insert_bit_error/i_sync_out/cdc_sync_stage1_reg[0]}]] \
+  $corundum_clk_period
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *sync_event_insert_bit_error/out_toggle_d1_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *sync_event_insert_bit_error/i_sync_in/cdc_sync_stage1_reg[0]}]] \
+  $direct_tx_clk_period
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *sync_event_insert_bit_error/cdc_hold_reg[0]}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *sync_event_insert_bit_error/out_event_reg[0]}]] \
+  $corundum_clk_period
+
+# total bits
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_total_bits/in_toggle_d1_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_total_bits/i_sync_out/cdc_sync_stage1_reg[0]}]] \
+  $direct_rx_clk_period
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_total_bits/out_toggle_d1_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_total_bits/i_sync_in/cdc_sync_stage1_reg[0]}]] \
+  $corundum_clk_period
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_total_bits/cdc_hold_reg[*]}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_total_bits/out_data_reg[*]}]] \
+  $direct_rx_clk_period
+
+# error bits total
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_error_bits_total/in_toggle_d1_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_error_bits_total/i_sync_out/cdc_sync_stage1_reg[0]}]] \
+  $direct_rx_clk_period
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_error_bits_total/out_toggle_d1_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_error_bits_total/i_sync_in/cdc_sync_stage1_reg[0]}]] \
+  $corundum_clk_period
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_error_bits_total/cdc_hold_reg[*]}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_error_bits_total/out_data_reg[*]}]] \
+  $direct_rx_clk_period
+
+# out of sync total
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_out_of_sync_total/in_toggle_d1_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_out_of_sync_total/i_sync_out/cdc_sync_stage1_reg[0]}]] \
+  $direct_rx_clk_period
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_out_of_sync_total/out_toggle_d1_reg}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_out_of_sync_total/i_sync_in/cdc_sync_stage1_reg[0]}]] \
+  $corundum_clk_period
+
+set_max_delay -datapath_only \
+  -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_out_of_sync_total/cdc_hold_reg[*]}]] \
+  -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hier -filter {NAME =~ *sync_data_out_of_sync_total/out_data_reg[*]}]] \
+  $direct_rx_clk_period

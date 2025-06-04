@@ -116,8 +116,7 @@ module ber_tester #(
     .m_axis_direct_tx_tvalid(m_axis_direct_tx_tvalid),
     .m_axis_direct_tx_tready(m_axis_direct_tx_tready),
     .m_axis_direct_tx_tlast(m_axis_direct_tx_tlast),
-    .m_axis_direct_tx_tuser(m_axis_direct_tx_tuser)
-  );
+    .m_axis_direct_tx_tuser(m_axis_direct_tx_tuser));
 
   ber_tester_rx #(
     .IF_COUNT(IF_COUNT),
@@ -144,7 +143,6 @@ module ber_tester #(
     .m_axis_direct_rx_tvalid(m_axis_direct_rx_tvalid),
     .m_axis_direct_rx_tready(m_axis_direct_rx_tready),
     .m_axis_direct_rx_tlast(m_axis_direct_rx_tlast),
-    .m_axis_direct_rx_tuser(m_axis_direct_rx_tuser)
-  );
+    .m_axis_direct_rx_tuser(m_axis_direct_rx_tuser));
 
 endmodule

@@ -39,6 +39,8 @@ adi_ip_files application_core [list \
   "$ad_hdl_dir/library/common/ad_mem.v" \
   "$ad_hdl_dir/library/util_cdc/sync_gray.v" \
   "$ad_hdl_dir/library/util_cdc/sync_bits.v" \
+  "$ad_hdl_dir/library/util_cdc/sync_data.v" \
+  "$ad_hdl_dir/library/util_cdc/sync_event.v" \
   "$ad_hdl_dir/library/util_axis_fifo_asym/util_axis_fifo_asym.v" \
   "$ad_hdl_dir/library/util_axis_fifo/util_axis_fifo.v" \
   "$ad_hdl_dir/library/util_axis_fifo/util_axis_fifo_address_generator.v" \

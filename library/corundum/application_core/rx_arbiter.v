@@ -102,52 +102,15 @@ module rx_arbiter #(
 
   localparam HEADER_LENGTH = 336;
 
-  reg  [CHANNELS-1:0] output_enable_old;
-  reg                 output_enable_ff;
-  wire                output_enable_ff_cdc;
-  reg                 output_enable_ff_cdc2;
-  reg  [CHANNELS-1:0] output_enable_cdc;
+  wire [CHANNELS-1:0] output_enable_cdc;
 
-  always @(posedge input_clk)
-  begin
-    if (!input_rstn) begin
-      output_enable_ff <= 1'b0;
-    end else begin
-      output_enable_old <= output_enable;
-      if (output_enable_old != output_enable) begin
-        output_enable_ff <= ~output_enable_ff;
-      end
-    end
-  end
-
-  sync_bits #(
-    .NUM_OF_BITS(1)
-  ) sync_bits_output_enable_ff (
-    .in_bits(output_enable_ff),
-    .out_resetn(rstn),
+  sync_data #(
+    .NUM_OF_BITS(CHANNELS)
+  ) sync_data_output_enable (
+    .in_clk(input_clk),
+    .in_data(output_enable),
     .out_clk(clk),
-    .out_bits(output_enable_ff_cdc)
-  );
-
-  always @(posedge clk)
-  begin
-    if (!rstn) begin
-      output_enable_ff_cdc2 <= 1'b0;
-    end else begin
-      output_enable_ff_cdc2 <= output_enable_ff_cdc;
-    end
-  end
-
-  always @(posedge clk)
-  begin
-    if (!rstn) begin
-      output_enable_cdc <= {CHANNELS{1'b0}};
-    end else begin
-      if (output_enable_ff_cdc2 ^ output_enable_ff_cdc) begin
-        output_enable_cdc <= output_enable;
-      end
-    end
-  end
+    .out_data(output_enable_cdc));
 
   reg [32-1:0] ip_header_checksum_reg0;
   reg [32-1:0] ip_header_checksum_reg1;

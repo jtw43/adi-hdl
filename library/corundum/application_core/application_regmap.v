@@ -99,7 +99,7 @@ module application_regmap #(
 
   output reg                             ber_test,
   output reg                             reset_ber,
-  output wire                            insert_bit_error,
+  output reg                             insert_bit_error,
 
   input  wire [63:0]                     total_bits,
   input  wire [63:0]                     error_bits_total,
@@ -118,43 +118,9 @@ module application_regmap #(
   reg  [31:0]                       up_rdata;
   reg                               up_rack;
 
-  wire [63:0] total_bits_cdc;
-  wire [63:0] error_bits_total_cdc;
-  wire [31:0] out_of_sync_total_cdc;
-
-  sync_bits #(
-    .NUM_OF_BITS(64)
-  ) sync_bits_total_bits (
-    .in_bits(total_bits),
-    .out_resetn(rstn),
-    .out_clk(clk),
-    .out_bits(total_bits_cdc)
-  );
-
-  sync_bits #(
-    .NUM_OF_BITS(64)
-  ) sync_bits_error_bits_total (
-    .in_bits(error_bits_total),
-    .out_resetn(rstn),
-    .out_clk(clk),
-    .out_bits(error_bits_total_cdc)
-  );
-
-  sync_bits #(
-    .NUM_OF_BITS(32)
-  ) sync_bits_out_of_sync_total (
-    .in_bits(out_of_sync_total),
-    .out_resetn(rstn),
-    .out_clk(clk),
-    .out_bits(out_of_sync_total_cdc)
-  );
-
   // Generic
   reg [31:0] version_reg = 'h1234ABCD;
   reg [31:0] scratch_reg;
-  reg [15:0] insert_bit_error_reg;
-
-  assign insert_bit_error = insert_bit_error_reg[15];
 
   always @(posedge clk)
   begin
@@ -191,7 +157,7 @@ module application_regmap #(
       // BER testing
       ber_test <= 1'b0;
       reset_ber <= 1'b0;
-      insert_bit_error_reg <= {16{1'b0}};
+      insert_bit_error <= 1'b0;
       // Sample count per channel
       sample_count <= 16'd64;
     end else begin
@@ -231,7 +197,7 @@ module application_regmap #(
           // BER testing
           'h1C: ber_test <= up_wdata[0];
           'h1D: reset_ber <= up_wdata[0];
-          'h23: insert_bit_error_reg <= {16{up_wdata[0]}};
+          'h23: insert_bit_error <= up_wdata[0];
           // Sample count per channel
           'h24: sample_count <= up_wdata[15:0];
           default: ;
@@ -239,7 +205,7 @@ module application_regmap #(
       end else begin
         start_counter_reg <= 1'b0;
         reset_ber <= 1'b0;
-        insert_bit_error_reg <= {insert_bit_error_reg[14:0], 1'b0};
+        insert_bit_error <= 1'b0;
       end
 
       if (up_rreq == 1'b1) begin
@@ -280,12 +246,12 @@ module application_regmap #(
           // BER testing
           'h1C: up_rdata <= {{31{1'b0}}, ber_test};
           'h1D: up_rdata <= {{31{1'b0}}, reset_ber};
-          'h1E: up_rdata <= total_bits_cdc[63:32];
-          'h1F: up_rdata <= total_bits_cdc[31:0];
-          'h20: up_rdata <= error_bits_total_cdc[63:32];
-          'h21: up_rdata <= error_bits_total_cdc[31:0];
-          'h22: up_rdata <= out_of_sync_total_cdc;
-          'h23: up_rdata <= {{31{1'b0}}, insert_bit_error_reg[0]};
+          'h1E: up_rdata <= total_bits[63:32];
+          'h1F: up_rdata <= total_bits[31:0];
+          'h20: up_rdata <= error_bits_total[63:32];
+          'h21: up_rdata <= error_bits_total[31:0];
+          'h22: up_rdata <= out_of_sync_total;
+          'h23: up_rdata <= {{31{1'b0}}, insert_bit_error};
           // Sample count per channel
           'h24: up_rdata <= {{16{1'b0}}, sample_count};
           default: up_rdata <= 32'd0;

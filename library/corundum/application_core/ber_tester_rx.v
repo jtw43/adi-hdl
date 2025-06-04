@@ -199,17 +199,6 @@ module ber_tester_rx #(
 
   endgenerate
 
-  wire reset_ber_cdc;
-
-  sync_bits #(
-    .NUM_OF_BITS(1)
-  ) sync_bits_reset_ber (
-    .in_bits(reset_ber),
-    .out_resetn(direct_rx_rstn),
-    .out_clk(direct_rx_clk),
-    .out_bits(reset_ber_cdc)
-  );
-
   always @(posedge direct_rx_clk)
   begin
     if (direct_rx_rst) begin
@@ -217,7 +206,7 @@ module ber_tester_rx #(
       out_of_sync_total <= {32{1'b0}};
       error_bits_total <= {64{1'b0}};
     end else begin
-      if (reset_ber_cdc) begin
+      if (reset_ber) begin
         total_bits <= {64{1'b0}};
         out_of_sync_total <= {32{1'b0}};
         error_bits_total <= {64{1'b0}};

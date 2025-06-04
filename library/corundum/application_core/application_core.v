@@ -568,8 +568,7 @@ module application_core #
     .rst_async(rst),
     .clk(clk),
     .rst(),
-    .rstn(rstn)
-  );
+    .rstn(rstn));
 
   wire start_app;
 
@@ -711,10 +710,28 @@ module application_core #
 
   wire        ber_test;
   wire        reset_ber;
+  wire        reset_ber_cdc;
   wire        insert_bit_error;
+  wire        insert_bit_error_cdc;
   wire [63:0] total_bits;
   wire [63:0] error_bits_total;
   wire [31:0] out_of_sync_total;
+
+  sync_event #(
+    .NUM_OF_EVENTS(1)
+  ) sync_event_reset_ber (
+    .in_clk(clk),
+    .in_event(reset_ber),
+    .out_clk(direct_rx_clk),
+    .out_event(reset_ber_cdc));
+
+  sync_event #(
+    .NUM_OF_EVENTS(1)
+  ) sync_event_insert_bit_error (
+    .in_clk(clk),
+    .in_event(insert_bit_error),
+    .out_clk(direct_tx_clk),
+    .out_event(insert_bit_error_cdc));
 
   ber_tester #(
     .IF_COUNT(IF_COUNT),
@@ -725,8 +742,8 @@ module application_core #
     .AXIS_RX_USER_WIDTH(AXIS_RX_USER_WIDTH)
   ) ber_tester_inst (
     .ber_test(ber_test),
-    .reset_ber(reset_ber),
-    .insert_bit_error(insert_bit_error),
+    .reset_ber(reset_ber_cdc),
+    .insert_bit_error(insert_bit_error_cdc),
     .total_bits(total_bits),
     .error_bits_total(error_bits_total),
     .out_of_sync_total(out_of_sync_total),
@@ -757,14 +774,41 @@ module application_core #
     .m_axis_direct_rx_tvalid(m_axis_direct_rx_tvalid),
     .m_axis_direct_rx_tready(m_axis_direct_rx_tready),
     .m_axis_direct_rx_tlast(m_axis_direct_rx_tlast),
-    .m_axis_direct_rx_tuser(m_axis_direct_rx_tuser)
-  );
+    .m_axis_direct_rx_tuser(m_axis_direct_rx_tuser));
 
   ////----------------------------------------AXI Interface-----------------//
   //////////////////////////////////////////////////
 
   wire                            start_counter_reg;
   reg  [31:0]                     counter_reg;
+
+  wire [63:0] total_bits_cdc;
+  wire [63:0] error_bits_total_cdc;
+  wire [31:0] out_of_sync_total_cdc;
+
+  sync_data #(
+    .NUM_OF_BITS(64)
+  ) sync_data_total_bits (
+    .in_clk(direct_rx_clk),
+    .in_data(total_bits),
+    .out_clk(clk),
+    .out_data(total_bits_cdc));
+
+  sync_data #(
+    .NUM_OF_BITS(64)
+  ) sync_data_error_bits_total (
+    .in_clk(direct_rx_clk),
+    .in_data(error_bits_total),
+    .out_clk(clk),
+    .out_data(error_bits_total_cdc));
+
+  sync_data #(
+    .NUM_OF_BITS(32)
+  ) sync_data_out_of_sync_total (
+    .in_clk(direct_rx_clk),
+    .in_data(out_of_sync_total),
+    .out_clk(clk),
+    .out_data(out_of_sync_total_cdc));
 
   application_regmap #(
     .AXIL_CTRL_DATA_WIDTH(AXIL_CTRL_DATA_WIDTH),
@@ -822,9 +866,9 @@ module application_core #
     .ber_test(ber_test),
     .reset_ber(reset_ber),
     .insert_bit_error(insert_bit_error),
-    .total_bits(total_bits),
-    .error_bits_total(error_bits_total),
-    .out_of_sync_total(out_of_sync_total),
+    .total_bits(total_bits_cdc),
+    .error_bits_total(error_bits_total_cdc),
+    .out_of_sync_total(out_of_sync_total_cdc),
 
     .sample_count(sample_count));
 

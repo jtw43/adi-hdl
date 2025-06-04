@@ -464,11 +464,50 @@ module application_tx #(
 
   wire packet_fifo_rstn;
 
+  reg [7:0] packet_counter;
+  reg packet_valid;
+
+  wire input_packet_last;
+  wire output_packet_last;
+
+  wire packet_buffer_axis_tready_gated;
+
+  assign input_packet_last = packet_axis_tlast && packet_axis_tready && packet_axis_tvalid;
+  assign output_packet_last = packet_buffer_axis_tlast && packet_buffer_axis_tready_gated && packet_buffer_axis_tvalid;
+
   assign packet_fifo_rstn = rstn && !(!run_packetizer && packet_buffer_axis_tready && packet_buffer_axis_tvalid && packet_buffer_axis_tlast);
+
+  assign packet_buffer_axis_tready_gated = packet_buffer_axis_tready && packet_valid;
+
+  always @(posedge clk)
+  begin
+    if (!rstn) begin
+      packet_counter <= 8'd0;
+    end else begin
+      if (!run_packetizer) begin
+        packet_counter <= 8'd0;
+      end else begin
+        case ({output_packet_last, input_packet_last})
+          2'b01: packet_counter <= packet_counter + 1;
+          2'b10: packet_counter <= packet_counter - 1;
+          default:;
+        endcase
+      end
+    end
+  end
+
+  always @(*)
+  begin
+    if (packet_counter != 8'd0) begin
+      packet_valid = 1'b1;
+    end else begin
+      packet_valid = 1'b0;
+    end
+  end
 
   util_axis_fifo #(
     .DATA_WIDTH(AXIS_DATA_WIDTH),
-    .ADDRESS_WIDTH($clog2(2**13 * 8 / AXIS_DATA_WIDTH)),
+    .ADDRESS_WIDTH($clog2(2**13 * 8 / AXIS_DATA_WIDTH)+1),
     .ASYNC_CLK(0),
     .M_AXIS_REGISTERED(1),
     .ALMOST_EMPTY_THRESHOLD(8192/INPUT_WIDTH),
@@ -479,7 +518,7 @@ module application_tx #(
   ) packet_buffer_fifo (
     .m_axis_aclk(clk),
     .m_axis_aresetn(packet_fifo_rstn),
-    .m_axis_ready(packet_buffer_axis_tready),
+    .m_axis_ready(packet_buffer_axis_tready_gated),
     .m_axis_valid(packet_buffer_axis_tvalid),
     .m_axis_data(packet_buffer_axis_tdata),
     .m_axis_tkeep(packet_buffer_axis_tkeep),
@@ -559,11 +598,12 @@ module application_tx #(
     if (!rstn) begin
       datapath_switch <= 1'b1;
     end else begin
-      if ((packet_buffer_almost_empty || os_buffer_axis_tvalid || !run_packetizer) && (packet_buffer_axis_tready && packet_buffer_axis_tvalid && packet_buffer_axis_tlast) || !packet_fifo_rstn) begin
-        datapath_switch <= 1'b0;
-      end else if (packet_buffer_almost_full && (!os_buffer_axis_tvalid || (os_buffer_axis_tready && os_buffer_axis_tvalid && os_buffer_axis_tlast))) begin
-        datapath_switch <= 1'b1;
-      end
+      datapath_switch <= 1'b1;
+      // if ((packet_buffer_almost_empty || os_buffer_axis_tvalid || !run_packetizer) && (packet_buffer_axis_tready && packet_buffer_axis_tvalid && packet_buffer_axis_tlast) || !packet_fifo_rstn) begin
+      //   datapath_switch <= 1'b0;
+      // end else if (packet_buffer_almost_full && (!os_buffer_axis_tvalid || (os_buffer_axis_tready && os_buffer_axis_tvalid && os_buffer_axis_tlast))) begin
+      //   datapath_switch <= 1'b1;
+      // end
     end
   end
 
@@ -581,7 +621,7 @@ module application_tx #(
     end else begin
       m_axis_sync_tx_tdata = packet_buffer_axis_tdata;
       m_axis_sync_tx_tkeep = packet_buffer_axis_tkeep;
-      m_axis_sync_tx_tvalid = packet_buffer_axis_tvalid;
+      m_axis_sync_tx_tvalid = packet_buffer_axis_tvalid && packet_valid;
       packet_buffer_axis_tready = m_axis_sync_tx_tready;
       m_axis_sync_tx_tlast = packet_buffer_axis_tlast;
       m_axis_sync_tx_tuser = 1'b0;
