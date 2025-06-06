@@ -14,13 +14,10 @@ adi_ip_create application_core
 adi_ip_files application_core [list \
   "application_core.v" \
   "application_tx.v" \
-  "application_tx_2.v" \
   "application_rx.v" \
   "rx_arbiter.v" \
   "header_inserter.v" \
-  "header_inserter_2.v" \
   "packetizer.v" \
-  "packetizer_2.v" \
   "udp_header.v" \
   "ip_header.v" \
   "ethernet_header.v" \

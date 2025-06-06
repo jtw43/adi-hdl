@@ -37,59 +37,89 @@
 
 module packetizer #(
 
-  parameter AXIS_DATA_WIDTH = 512,
-  parameter CHANNELS = 4,
-  parameter SAMPLE_DATA_WIDTH = 16
+  parameter AXIS_DATA_WIDTH = 512
 ) (
 
   input  wire                         clk,
   input  wire                         rstn,
 
   // input
+  output wire                         input_axis_tready,
   input  wire                         input_axis_tvalid,
-  input  wire                         input_axis_tready,
-  input  wire [$clog2(CHANNELS):0]    input_enable,
+  input  wire [AXIS_DATA_WIDTH-1:0]   input_axis_tdata,
+  input  wire [AXIS_DATA_WIDTH/8-1:0] input_axis_tkeep,
 
+  // output
   input  wire                         output_axis_tready,
+  output wire                         output_axis_tvalid,
+  output wire [AXIS_DATA_WIDTH-1:0]   output_axis_tdata,
+  output wire [AXIS_DATA_WIDTH/8-1:0] output_axis_tkeep,
+  output wire                         output_axis_tlast,
 
-  input  wire [15:0]                  sample_count,
-  output reg                          packet_tlast
+  input  wire [31:0]                  packet_size
 );
 
-  reg  [15:0] sample_counter;
-  reg  [15:0] packet_size_dynamic;
-  wire [15:0] packet_size_dynamic_calc;
-
-  assign packet_size_dynamic_calc = sample_count * input_enable / (AXIS_DATA_WIDTH/SAMPLE_DATA_WIDTH);
+  reg [31:0] sample_counter;
+  reg        packet_last;
 
   always @(posedge clk)
   begin
     if (!rstn) begin
-      packet_size_dynamic <= 'd0;
-    end else begin
-      packet_size_dynamic <= packet_size_dynamic_calc;
-    end
-  end
-
-  always @(posedge clk)
-  begin
-    if (!rstn) begin
-      sample_counter <= 8'd0;
-      packet_tlast <= 1'b0;
+      if (sample_counter < packet_size-1) begin
+        sample_counter <= 32'd1;
+        packet_last <= 1'b0;
+      end else begin
+        sample_counter <= 32'd0;
+        packet_last <= 1'b1;
+      end
     end else begin
       if (input_axis_tvalid && input_axis_tready) begin
-        if (sample_counter < packet_size_dynamic-1) begin
+        if (sample_counter < packet_size-1) begin
           sample_counter <= sample_counter + 1;
+          packet_last <= 1'b0;
         end else begin
-          sample_counter <= 8'd0;
-          packet_tlast <= 1'b1;
-        end
-      end else begin
-        if (output_axis_tready) begin
-          packet_tlast <= 1'b0;
+          sample_counter <= 32'd0;
+          packet_last <= 1'b1;
         end
       end
     end
   end
+
+  util_axis_fifo #(
+    .DATA_WIDTH(AXIS_DATA_WIDTH),
+    .ADDRESS_WIDTH(2),
+    .ASYNC_CLK(0),
+    .M_AXIS_REGISTERED(1),
+    .ALMOST_EMPTY_THRESHOLD(),
+    .ALMOST_FULL_THRESHOLD(),
+    .TLAST_EN(1),
+    .TKEEP_EN(1),
+    .REMOVE_NULL_BEAT_EN(0)
+  ) packet_buffer_fifo (
+    .m_axis_aclk(clk),
+    .m_axis_aresetn(rstn),
+    .m_axis_ready(output_axis_tready),
+    .m_axis_valid(output_axis_tvalid),
+    .m_axis_data(output_axis_tdata),
+    .m_axis_tkeep(output_axis_tkeep),
+    .m_axis_tlast(output_axis_tlast),
+    .m_axis_level(),
+    .m_axis_empty(),
+    .m_axis_almost_empty(),
+    .m_axis_full(),
+    .m_axis_almost_full(),
+
+    .s_axis_aclk(clk),
+    .s_axis_aresetn(rstn),
+    .s_axis_ready(input_axis_tready),
+    .s_axis_valid(input_axis_tvalid),
+    .s_axis_data(input_axis_tdata),
+    .s_axis_tkeep(input_axis_tkeep),
+    .s_axis_tlast(packet_last),
+    .s_axis_room(),
+    .s_axis_empty(),
+    .s_axis_almost_empty(),
+    .s_axis_full(),
+    .s_axis_almost_full());
 
 endmodule

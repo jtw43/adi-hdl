@@ -10,13 +10,10 @@ XILINX_DEPS += application_core_ip.tcl
 
 GENERIC_DEPS += application_core.v
 GENERIC_DEPS += application_tx.v
-GENERIC_DEPS += application_tx_2.v
 GENERIC_DEPS += application_rx.v
 GENERIC_DEPS += rx_arbiter.v
 GENERIC_DEPS += header_inserter.v
-GENERIC_DEPS += header_inserter_2.v
 GENERIC_DEPS += packetizer.v
-GENERIC_DEPS += packetizer_2.v
 GENERIC_DEPS += udp_header.v
 GENERIC_DEPS += ip_header.v
 GENERIC_DEPS += ethernet_header.v

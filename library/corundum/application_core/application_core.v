@@ -602,7 +602,7 @@ module application_core #
   // Sample count per channel
   wire [15:0] sample_count;
 
-  application_tx_2 #(
+  application_tx #(
     .IF_COUNT(IF_COUNT),
     .PORTS_PER_IF(PORTS_PER_IF),
     .AXIS_DATA_WIDTH(AXIS_SYNC_DATA_WIDTH),
