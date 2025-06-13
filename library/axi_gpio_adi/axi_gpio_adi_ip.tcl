@@ -14,7 +14,7 @@ adi_ip_files axi_gpio_adi [list \
 
 adi_ip_properties axi_gpio_adi
 
-set_property company_url {https://wiki.analog.com/resources/fpga/docs/axi_fan_control} [ipx::current_core]
+#set_property company_url {https://wiki.analog.com/resources/fpga/docs/axi_fan_control} [ipx::current_core]
 
 set cc [ipx::current_core]
 

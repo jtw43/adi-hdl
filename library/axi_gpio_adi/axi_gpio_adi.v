@@ -34,7 +34,7 @@
 // ***************************************************************************
 `timescale 1ns / 1ps
 
-module axi_gpio_adi #(
+module axi_gpio_adi (
   
   output      reg         irq,
   //axi interface
@@ -65,6 +65,10 @@ module axi_gpio_adi #(
 );
   reg                     up_resetn = 1'b0;
   
+  reg                     up_wack = 'd0;
+  reg         [31:0]      up_rdata = 'd0;
+  reg                     up_rack = 'd0;
+  wire        [31:0]      up_wdata_s;
   //IRQ
   reg         [3:0]      up_irq_mask = 4'b1111;
   reg         [3:0]      up_irq_source = 4'h0;
@@ -74,6 +78,9 @@ module axi_gpio_adi #(
   
   //CLK
   wire                   up_clk;
+  
+  reg [3:0] gpio_out_reg;
+  assign gpio_out = gpio_out_reg;
   assign up_clk = s_axi_aclk;
 
   //IRQ handling
@@ -128,9 +135,11 @@ module axi_gpio_adi #(
 
   //axi registers write
   always @(posedge up_clk) begin
-	if (up_resetn == 1'b1) begin
+	if (up_resetn == 1'b0) begin
+	   gpio_out_reg <= 'h0;
+	end else begin
 		if ((up_wreq_s == 1'b1) && (up_waddr_s == 8'h21)) begin
-			gpio_out <= up_wdata_s[3:0]; 
+			gpio_out_reg <= up_wdata_s[3:0]; 
 		end
 	end
   end
@@ -153,7 +162,7 @@ module axi_gpio_adi #(
       up_rack <= up_rreq_s;
       if (up_rreq_s == 1'b1) begin
         case (up_raddr_s)
-          8'h21: up_rdata <= gpio_out;
+          8'h21: up_rdata <= gpio_out_reg;
           8'h22: up_rdata <= gpio_in;
           default: up_rdata <= 0;
         endcase
@@ -211,15 +220,15 @@ module axi_gpio_adi #(
     end
   end
 
-  assign gpio_out[0] = led_state;
+  //assign gpio_out_reg[0] = led_state;
 
-  always @(posedge up_clk) begin
-    if (up_resetn == 1'b0) begin
-      gpio_out <= 4'b0000;
-    end else if ((up_wreq_s == 1'b1) && (up_waddr_s == 8'h21)) begin
-      gpio_out <= up_wdata_s[3:0]; 
-    end
-  end
+  //always @(posedge up_clk) begin
+   // if (up_resetn == 1'b0) begin
+   //  gpio_out_reg <= 4'b0000;
+  //  end else if ((up_wreq_s == 1'b1) && (up_waddr_s == 8'h21)) begin
+   //  gpio_out_reg<= up_wdata_s[3:0]; 
+   // end
+//  end
  
  
 endmodule

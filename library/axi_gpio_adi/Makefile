@@ -4,12 +4,11 @@
 ## Auto-generated, do not modify!
 ####################################################################################
 
-LIBRARY_NAME := axi_fan_control
+LIBRARY_NAME := axi_gpio_adi
 
 GENERIC_DEPS += ../common/up_axi.v
-GENERIC_DEPS += ../common/util_pulse_gen.v
-GENERIC_DEPS += axi_fan_control.v
+GENERIC_DEPS += axi_gpio_adi.v
 
-XILINX_DEPS += axi_fan_control_ip.tcl
+XILINX_DEPS += axi_gpio_adi_ip.tcl
 
 include ../scripts/library.mk
