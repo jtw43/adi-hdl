@@ -11,7 +11,10 @@ puts "build parameter value RESOLUTION_16_18N = $RESOLUTION_16_18N"
 
 set ADC_RES [expr {$RESOLUTION_16_18N == 1 ? 16 : 18}]
 set OUT_RES [expr {$RESOLUTION_16_18N == 1 ? 16 : 32}]
-
+set CLK_GATE_WIDTH [expr {($TWOLANES == 0 && $RESOLUTION_16_18N == 0) ? 9 : \
+                          ($TWOLANES == 0 && $RESOLUTION_16_18N == 1) ? 8 : \
+                          ($TWOLANES == 1 && $RESOLUTION_16_18N == 0) ? 5 : \
+                          4}]
 # ltc2387 i/o
 
 create_bd_port -dir I ref_clk
@@ -39,7 +42,7 @@ ad_ip_instance axi_pwm_gen axi_pwm_gen
 ad_ip_parameter axi_pwm_gen CONFIG.N_PWMS 2
 ad_ip_parameter axi_pwm_gen CONFIG.PULSE_0_WIDTH 1
 ad_ip_parameter axi_pwm_gen CONFIG.PULSE_0_PERIOD 8
-ad_ip_parameter axi_pwm_gen CONFIG.PULSE_1_WIDTH 5
+ad_ip_parameter axi_pwm_gen CONFIG.PULSE_1_WIDTH $CLK_GATE_WIDTH
 ad_ip_parameter axi_pwm_gen CONFIG.PULSE_1_PERIOD 8
 ad_ip_parameter axi_pwm_gen CONFIG.PULSE_1_OFFSET 0
 
