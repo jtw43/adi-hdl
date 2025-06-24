@@ -21,6 +21,9 @@ adi_ip_files application_core [list \
   "udp_header.v" \
   "ip_header.v" \
   "ethernet_header.v" \
+  "udp_header_mask.v" \
+  "ip_header_mask.v" \
+  "ethernet_header_mask.v" \
   "prbs.v" \
   "prbs_gen.v" \
   "prbs_mon.v" \

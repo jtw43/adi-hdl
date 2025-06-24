@@ -109,7 +109,11 @@ module application_tx #(
   input  wire [16-1:0]                   udp_checksum,
 
   // Sample count per channel
-  input  wire [15:0]                     sample_count
+  input  wire [15:0]                     sample_count,
+
+  // BER
+  input  wire                            ber_test,
+  input  wire                            insert_bit_error
 );
 
   localparam INPUT_WIDTH = CHANNELS*SAMPLES_PER_CHANNEL*SAMPLE_DATA_WIDTH;
@@ -273,7 +277,7 @@ module application_tx #(
   wire [AXIS_DATA_WIDTH-1:0] cdc_axis_tdata;
   wire [AXIS_KEEP_WIDTH-1:0] cdc_axis_tkeep;
   wire                       cdc_axis_tvalid;
-  wire                       cdc_axis_tready;
+  reg                        cdc_axis_tready;
   reg                        cdc_axis_tvalid_gated;
   reg                        cdc_axis_tready_gated;
 
@@ -322,7 +326,7 @@ module application_tx #(
     .ALMOST_EMPTY_THRESHOLD(4096/INPUT_WIDTH),
     .ALMOST_FULL_THRESHOLD($clog2(2**13 * 8 / INPUT_WIDTH)),
     .TLAST_EN(0),
-    .TKEEP_EN(0),
+    .TKEEP_EN(1),
     .FIFO_LIMITED(0),
     .ADDRESS_WIDTH_PERSPECTIVE(1)
   ) cdc_scale_fifo (
@@ -352,6 +356,58 @@ module application_tx #(
     .s_axis_almost_full(input_fifo_almost_full),
     .s_axis_room());
 
+  ////----------------------------------------BER--------------------//
+  //////////////////////////////////////////////////
+
+  reg                        ber_axis_tready;
+  wire                       ber_axis_tvalid;
+  wire [AXIS_DATA_WIDTH-1:0] ber_axis_tdata;
+  wire [AXIS_KEEP_WIDTH-1:0] ber_axis_tkeep;
+
+  ber_tester_tx #(
+    .IF_COUNT(IF_COUNT),
+    .PORTS_PER_IF(PORTS_PER_IF),
+    .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH),
+    .AXIS_KEEP_WIDTH(AXIS_KEEP_WIDTH)
+  ) ber_tester_tx_inst (
+    .clk(clk),
+    .rstn(rstn),
+    .ber_test(ber_test),
+    .insert_bit_error(insert_bit_error),
+    .m_axis_output_tdata(ber_axis_tdata),
+    .m_axis_output_tkeep(ber_axis_tkeep),
+    .m_axis_output_tvalid(ber_axis_tvalid),
+    .m_axis_output_tready(ber_axis_tready));
+
+  ////----------------------------------------JESD-BER switch--------------------//
+  //////////////////////////////////////////////////
+
+  wire                       packetizer_axis_tready;
+  reg                        packetizer_axis_tvalid;
+  reg  [AXIS_DATA_WIDTH-1:0] packetizer_axis_tdata;
+  reg  [AXIS_KEEP_WIDTH-1:0] packetizer_axis_tkeep;
+
+  always @(*)
+  begin
+    if (!ber_test) begin
+      packetizer_axis_tvalid = cdc_axis_tvalid_gated;
+      packetizer_axis_tdata = cdc_axis_tdata;
+      packetizer_axis_tkeep = cdc_axis_tkeep;
+
+      cdc_axis_tready = packetizer_axis_tready;
+
+      ber_axis_tready = 1'b0;
+    end else begin
+      packetizer_axis_tvalid = ber_axis_tvalid;
+      packetizer_axis_tdata = ber_axis_tdata;
+      packetizer_axis_tkeep = ber_axis_tkeep;
+
+      cdc_axis_tready = 1'b0;
+
+      ber_axis_tready = packetizer_axis_tready;
+    end
+  end
+
   ////----------------------------------------Packetizer--------------------//
   //////////////////////////////////////////////////
 
@@ -372,10 +428,10 @@ module application_tx #(
   ) packetizer_inst (
     .clk(clk),
     .rstn(rstn_output_gated),
-    .input_axis_tready(cdc_axis_tready),
-    .input_axis_tvalid(cdc_axis_tvalid_gated),
-    .input_axis_tdata(cdc_axis_tdata),
-    .input_axis_tkeep(cdc_axis_tkeep),
+    .input_axis_tready(packetizer_axis_tready),
+    .input_axis_tvalid(packetizer_axis_tvalid),
+    .input_axis_tdata(packetizer_axis_tdata),
+    .input_axis_tkeep(packetizer_axis_tkeep),
 
     .output_axis_tready(packet_axis_tready),
     .output_axis_tvalid(packet_axis_tvalid),
@@ -678,20 +734,22 @@ module application_tx #(
       m_axis_sync_tx_tdata = os_buffer_axis_tdata;
       m_axis_sync_tx_tkeep = os_buffer_axis_tkeep;
       m_axis_sync_tx_tvalid = os_buffer_axis_tvalid;
-      os_buffer_axis_tready = m_axis_sync_tx_tready;
       m_axis_sync_tx_tlast = os_buffer_axis_tlast;
       m_axis_sync_tx_tuser = os_buffer_axis_tuser;
+
+      os_buffer_axis_tready = m_axis_sync_tx_tready;
 
       header_buffer_axis_tready = 1'b0;
     end else begin
       m_axis_sync_tx_tdata = header_buffer_axis_tdata;
       m_axis_sync_tx_tkeep = header_buffer_axis_tkeep;
       m_axis_sync_tx_tvalid = header_buffer_axis_tvalid_gated;
-      header_buffer_axis_tready = m_axis_sync_tx_tready;
       m_axis_sync_tx_tlast = header_buffer_axis_tlast;
       m_axis_sync_tx_tuser = 1'b0;
 
       os_buffer_axis_tready = 1'b0;
+
+      header_buffer_axis_tready = m_axis_sync_tx_tready;
     end
   end
 

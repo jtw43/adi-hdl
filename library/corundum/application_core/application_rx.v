@@ -49,8 +49,9 @@ module application_rx #(
   parameter AXIS_RX_USER_WIDTH = 17,
 
   // Input stream
-  parameter OUTPUT_WIDTH = 2048,
-  parameter CHANNELS = 4
+  parameter CHANNELS = 4,
+  parameter SAMPLES_PER_CHANNEL = 16,
+  parameter SAMPLE_DATA_WIDTH = 16
 ) (
 
   input  wire                            clk,
@@ -75,14 +76,13 @@ module application_rx #(
   input  wire                            output_clk,
   input  wire                            output_rstn,
 
-  output wire [OUTPUT_WIDTH-1:0]         output_axis_tdata,
-  output wire                            output_axis_tvalid,
-  input  wire                            output_axis_tready,
+  output wire [CHANNELS*SAMPLES_PER_CHANNEL*SAMPLE_DATA_WIDTH-1:0] output_axis_tdata,
+  output wire                                                      output_axis_tvalid,
+  input  wire                                                      output_axis_tready,
 
   input  wire [CHANNELS-1:0]             output_enable,
 
   input  wire                            start_app,
-  input  wire [15:0]                     packet_size,
 
   // Ethernet header
   input  wire [48-1:0]                   ethernet_destination_MAC,
@@ -104,47 +104,204 @@ module application_rx #(
   // UDP header
   input  wire [16-1:0]                   udp_source,
   input  wire [16-1:0]                   udp_destination,
-  input  wire [16-1:0]                   udp_checksum
+  input  wire [16-1:0]                   udp_checksum,
+
+  // Sample count per channel
+  input  wire [15:0]                     sample_count,
+
+  // BER
+  input  wire                            ber_test,
+  input  wire                            reset_ber,
+
+  output wire [63:0]                     total_bits,
+  output wire [63:0]                     error_bits_total,
+  output wire [31:0]                     out_of_sync_total
 );
 
-  `HTOND(16)
+  localparam OUTPUT_WIDTH = CHANNELS*SAMPLES_PER_CHANNEL*SAMPLE_DATA_WIDTH;
+  localparam HEADER_LENGTH = 336;
+
+  wire [CHANNELS-1:0] output_enable_cdc;
+
+  sync_data #(
+    .NUM_OF_BITS(CHANNELS)
+  ) sync_data_output_enable (
+    .in_clk(output_clk),
+    .in_data(output_enable),
+    .out_clk(clk),
+    .out_data(output_enable_cdc));
 
   ////----------------------------------------Arbiter-------------------------//
   //////////////////////////////////////////////////
 
-  wire valid;
+  function [$clog2(CHANNELS):0] converters(input [CHANNELS-1:0] input_enable);
+    integer i;
+    begin
+      converters = 0;
+      for (i=0; i<CHANNELS; i=i+1) begin
+        converters = converters + input_enable[i];
+      end
+    end
+  endfunction
 
-  rx_arbiter #(
-    .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH),
-    .CHANNELS(CHANNELS)
-  ) rx_arbiter_inst (
+  // header creation
+  wire [64-1:0] udp_header_part;
+  wire [15:0] udp_length;
+
+  reg [15:0] udp_payload_size;
+
+  always @(posedge clk)
+  begin
+    udp_payload_size <= sample_count * converters(output_enable_cdc) * (SAMPLE_DATA_WIDTH/8);
+  end
+
+  udp_header udp_header_inst (
     .clk(clk),
     .rstn(rstn),
-    .start_app(start_app),
-    .packet_size(packet_size),
-    .ethernet_destination_MAC(ethernet_destination_MAC),
-    .ethernet_source_MAC(ethernet_source_MAC),
-    .ethernet_type(ethernet_type),
+    .udp_source(udp_source),
+    .udp_destination(udp_destination),
+    .udp_length(udp_length),
+    .udp_checksum(udp_checksum),
+    .payload_length(udp_payload_size),
+    .header(udp_header_part));
+
+  wire [160-1:0] ip_header_part;
+
+  ip_header ip_header_inst (
+    .clk(clk),
+    .rstn(rstn),
     .ip_version(ip_version),
     .ip_header_length(ip_header_length),
     .ip_type_of_service(ip_type_of_service),
+    .ip_total_length(),
     .ip_identification(ip_identification),
     .ip_flags(ip_flags),
     .ip_fragment_offset(ip_fragment_offset),
     .ip_time_to_live(ip_time_to_live),
     .ip_protocol(ip_protocol),
+    .ip_header_checksum(),
     .ip_source_IP_address(ip_source_IP_address),
     .ip_destination_IP_address(ip_destination_IP_address),
-    .udp_source(udp_source),
-    .udp_destination(udp_destination),
-    .udp_checksum(udp_checksum),
-    .input_clk(output_clk),
-    .input_rstn(output_rstn),
+    .payload_length(udp_length),
+    .header(ip_header_part));
+
+  wire [112-1:0] ethernet_header_part;
+
+  ethernet_header ethernet_header_inst (
+    .ethernet_destination_MAC(ethernet_destination_MAC),
+    .ethernet_source_MAC(ethernet_source_MAC),
+    .ethernet_type(ethernet_type),
+    .header(ethernet_header_part));
+
+  wire [HEADER_LENGTH-1:0] complete_header;
+
+  assign complete_header = {
+    udp_header_part,
+    ip_header_part,
+    ethernet_header_part};
+
+  // header routing mask creation
+  wire [64-1:0] udp_header_routing_mask_part;
+
+  udp_header_mask udp_header_routing_mask_inst (
+    .udp_source(1'b0),
+    .udp_destination(1'b0),
+    .udp_length(1'b0),
+    .udp_checksum(1'b0),
+    .header_mask(udp_header_routing_mask_part));
+
+  wire [160-1:0] ip_header_routing_mask_part;
+
+  ip_header_mask ip_header_routing_mask_inst (
+    .ip_version(1'b0),
+    .ip_header_length(1'b0),
+    .ip_type_of_service(1'b0),
+    .ip_total_length(1'b0),
+    .ip_identification(1'b0),
+    .ip_flags(1'b0),
+    .ip_fragment_offset(1'b0),
+    .ip_time_to_live(1'b0),
+    .ip_protocol(1'b0),
+    .ip_header_checksum(1'b0),
+    .ip_source_IP_address(1'b1),
+    .ip_destination_IP_address(1'b1),
+    .header_mask(ip_header_routing_mask_part));
+
+  wire [112-1:0] ethernet_header_routing_mask_part;
+
+  ethernet_header_mask ethernet_header_routing_mask_inst (
+    .ethernet_destination_MAC(1'b0),
+    .ethernet_source_MAC(1'b0),
+    .ethernet_type(1'b0),
+    .header_mask(ethernet_header_routing_mask_part));
+
+  wire [HEADER_LENGTH-1:0] complete_header_routing_mask;
+
+  assign complete_header_routing_mask = {
+    udp_header_routing_mask_part,
+    ip_header_routing_mask_part,
+    ethernet_header_routing_mask_part};
+
+  // header validation mask creation
+  wire [64-1:0] udp_header_validation_mask_part;
+
+  udp_header_mask udp_header_validation_mask_inst (
+    .udp_source(1'b0),
+    .udp_destination(1'b0),
+    .udp_length(1'b0),
+    .udp_checksum(1'b0),
+    .header_mask(udp_header_validation_mask_part));
+
+  wire [160-1:0] ip_header_validation_mask_part;
+
+  ip_header_mask ip_header_validation_mask_inst (
+    .ip_version(1'b0),
+    .ip_header_length(1'b0),
+    .ip_type_of_service(1'b0),
+    .ip_total_length(1'b0),
+    .ip_identification(1'b0),
+    .ip_flags(1'b0),
+    .ip_fragment_offset(1'b0),
+    .ip_time_to_live(1'b0),
+    .ip_protocol(1'b0),
+    .ip_header_checksum(1'b0),
+    .ip_source_IP_address(1'b0),
+    .ip_destination_IP_address(1'b0),
+    .header_mask(ip_header_validation_mask_part));
+
+  wire [112-1:0] ethernet_header_validation_mask_part;
+
+  ethernet_header_mask ethernet_header_validation_mask_inst (
+    .ethernet_destination_MAC(1'b0),
+    .ethernet_source_MAC(1'b0),
+    .ethernet_type(1'b0),
+    .header_mask(ethernet_header_validation_mask_part));
+
+  wire [HEADER_LENGTH-1:0] complete_header_validation_mask;
+
+  assign complete_header_validation_mask = {
+    udp_header_validation_mask_part,
+    ip_header_validation_mask_part,
+    ethernet_header_validation_mask_part};
+
+  wire valid;
+  wire switch;
+
+  rx_arbiter #(
+    .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH),
+    .HEADER_LENGTH(HEADER_LENGTH),
+    .VALIDATION_EN(1)
+  ) rx_arbiter_inst (
+    .clk(clk),
+    .rstn(rstn),
+    .start_app(start_app),
+    .header(complete_header),
+    .header_routing_list(complete_header_routing_mask),
+    .header_validation_list(complete_header_validation_mask),
     .input_axis_tvalid(s_axis_sync_rx_tvalid),
     .input_axis_tready(s_axis_sync_rx_tready),
     .input_axis_tdata(s_axis_sync_rx_tdata),
     .input_axis_tlast(s_axis_sync_rx_tlast),
-    .output_enable(output_enable),
     .valid(valid),
     .switch(switch));
 
@@ -174,29 +331,30 @@ module application_rx #(
     end
   end
 
-  localparam HEADER_LENGTH = 336;
+  reg [HEADER_LENGTH-1:0] bypass_axis_tdata_reg;
+  reg [HEADER_LENGTH-1:0] bypass_axis_tkeep_reg;
 
-  reg  [IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH-1:0]    input_axis_tdata_reg [1:0];
-  reg  [IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH-1:0]    input_axis_tkeep_reg [1:0];
-  reg  [IF_COUNT*PORTS_PER_IF-1:0]                    input_axis_tvalid_reg [1:0];
-  wire [IF_COUNT*PORTS_PER_IF-1:0]                    input_axis_tready_reg;
-  reg  [IF_COUNT*PORTS_PER_IF-1:0]                    input_axis_tlast_reg;
+  reg [AXIS_DATA_WIDTH-HEADER_LENGTH-1:0]   temp_axis_tdata_reg;
+  reg [AXIS_KEEP_WIDTH-HEADER_LENGTH/8-1:0] temp_axis_tkeep_reg;
 
-
-  integer j;
-  reg [HEADER_LENGTH-1:0] reg_part1;
-  reg [AXIS_DATA_WIDTH-1-HEADER_LENGTH:0] reg_part2;
-
-  // raw data to network byte order
   always @(*)
   begin
-    for (j=0; j<HEADER_LENGTH/16; j=j+1) begin
-      reg_part1[j*16+:16] = htond_16(axis_sync_rx_tdata_reg[j*16+:16]);
-    end
-    for (j=0; j<(AXIS_DATA_WIDTH-HEADER_LENGTH)/16; j=j+1) begin
-      reg_part2[j*16+:16] = htond_16(axis_sync_rx_tdata_reg[j*16+:16]);
-    end
+    bypass_axis_tdata_reg = axis_sync_rx_tdata_reg[HEADER_LENGTH-1:0];
+    bypass_axis_tkeep_reg = axis_sync_rx_tkeep_reg[HEADER_LENGTH/8-1:0];
   end
+
+  always @(posedge clk)
+  begin
+    temp_axis_tdata_reg <= axis_sync_rx_tdata_reg[AXIS_DATA_WIDTH-1:HEADER_LENGTH];
+    temp_axis_tkeep_reg <= axis_sync_rx_tkeep_reg[AXIS_DATA_WIDTH/8-1:HEADER_LENGTH/8];
+  end
+
+  reg [AXIS_DATA_WIDTH-1:0] buffer_axis_tdata_reg;
+  reg [AXIS_KEEP_WIDTH-1:0] buffer_axis_tkeep_reg;
+
+  reg [IF_COUNT*PORTS_PER_IF-1:0] input_axis_tvalid_reg [1:0];
+  reg [IF_COUNT*PORTS_PER_IF-1:0] input_axis_tready_reg;
+  reg [IF_COUNT*PORTS_PER_IF-1:0] input_axis_tlast_reg;
 
   always @(posedge clk)
   begin
@@ -215,14 +373,13 @@ module application_rx #(
         m_axis_sync_rx_tlast <= axis_sync_rx_tlast_reg;
         m_axis_sync_rx_tuser <= axis_sync_rx_tuser_reg;
 
-        input_axis_tdata_reg[0] <= {IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH{1'b0}};
-        input_axis_tkeep_reg[0] <= {IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH{1'b0}};
-        input_axis_tvalid_reg[0] <= {IF_COUNT*PORTS_PER_IF{1'b0}};
-        input_axis_tlast_reg <= {IF_COUNT*PORTS_PER_IF{1'b0}};
+        buffer_axis_tdata_reg <= {IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH{1'b0}};
+        buffer_axis_tkeep_reg <= {IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH{1'b0}};
 
-        input_axis_tdata_reg[1] <= {IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH{1'b0}};
-        input_axis_tkeep_reg[1] <= {IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH{1'b0}};
+        input_axis_tvalid_reg[0] <= {IF_COUNT*PORTS_PER_IF{1'b0}};
         input_axis_tvalid_reg[1] <= {IF_COUNT*PORTS_PER_IF{1'b0}};
+
+        input_axis_tlast_reg <= {IF_COUNT*PORTS_PER_IF{1'b0}};
 
         axis_sync_rx_tready_reg <= m_axis_sync_rx_tready;
       end else begin
@@ -232,13 +389,11 @@ module application_rx #(
         m_axis_sync_rx_tlast <= {IF_COUNT*PORTS_PER_IF{1'b0}};
         m_axis_sync_rx_tuser <= {IF_COUNT*PORTS_PER_IF*AXIS_RX_USER_WIDTH{1'b0}};
 
-        if (valid) begin
-          input_axis_tdata_reg[0] <= {IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH{1'b0}};
-          input_axis_tkeep_reg[0] <= {IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH{1'b0}};
-          input_axis_tvalid_reg[0] <= {IF_COUNT*PORTS_PER_IF{1'b0}};
+        if (!valid) begin
+          buffer_axis_tdata_reg <= {IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH{1'b0}};
+          buffer_axis_tkeep_reg <= {IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH{1'b0}};
 
-          input_axis_tdata_reg[1] <= {IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH{1'b0}};
-          input_axis_tkeep_reg[1] <= {IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH{1'b0}};
+          input_axis_tvalid_reg[0] <= {IF_COUNT*PORTS_PER_IF{1'b0}};
           input_axis_tvalid_reg[1] <= {IF_COUNT*PORTS_PER_IF{1'b0}};
 
           input_axis_tlast_reg <= {IF_COUNT*PORTS_PER_IF{1'b0}};
@@ -246,13 +401,11 @@ module application_rx #(
           axis_sync_rx_tready_reg <= {IF_COUNT*PORTS_PER_IF{1'b1}};
         end else begin
           // header extraction
-          input_axis_tdata_reg[0] <= reg_part1;
-          input_axis_tkeep_reg[0] <= axis_sync_rx_tkeep_reg[AXIS_DATA_WIDTH/8-1:(AXIS_DATA_WIDTH-HEADER_LENGTH)/8];
-          input_axis_tvalid_reg[0] <= axis_sync_rx_tvalid_reg;
+          buffer_axis_tdata_reg <= {bypass_axis_tdata_reg, temp_axis_tdata_reg};
+          buffer_axis_tkeep_reg <= {bypass_axis_tkeep_reg, temp_axis_tkeep_reg};
 
-          input_axis_tdata_reg[1] <= {input_axis_tdata_reg[0], reg_part2};
-          input_axis_tkeep_reg[1] <= {input_axis_tkeep_reg[0], axis_sync_rx_tkeep_reg[(AXIS_DATA_WIDTH-HEADER_LENGTH)/8-1:0]};
-          input_axis_tvalid_reg[1] <= input_axis_tvalid_reg[0];
+          input_axis_tvalid_reg[0] <= axis_sync_rx_tvalid_reg;
+          input_axis_tvalid_reg[1] <= input_axis_tvalid_reg[0] && !input_axis_tlast_reg;
 
           input_axis_tlast_reg <= axis_sync_rx_tlast_reg;
 
@@ -267,16 +420,20 @@ module application_rx #(
   ////----------------------------------------Buffer, CDC and Scaling FIFO----//
   //////////////////////////////////////////////////
 
+  wire                       jesd_axis_tready;
+  reg                        jesd_axis_tvalid;
+  reg  [AXIS_DATA_WIDTH-1:0] jesd_axis_tdata;
+
   util_axis_fifo_asym #(
     .ASYNC_CLK(1),
     .S_DATA_WIDTH(AXIS_DATA_WIDTH),
-    .ADDRESS_WIDTH($clog2(8192/OUTPUT_WIDTH)+1),
+    .ADDRESS_WIDTH($clog2(2**13 * 8 / OUTPUT_WIDTH)+1),
     .M_DATA_WIDTH(OUTPUT_WIDTH),
     .M_AXIS_REGISTERED(1),
     .ALMOST_EMPTY_THRESHOLD(0),
     .ALMOST_FULL_THRESHOLD(0),
-    .TLAST_EN(1),
-    .TKEEP_EN(1),
+    .TLAST_EN(0),
+    .TKEEP_EN(0),
     .FIFO_LIMITED(0),
     .ADDRESS_WIDTH_PERSPECTIVE(1)
   ) cdc_scale_fifo (
@@ -295,15 +452,69 @@ module application_rx #(
 
     .s_axis_aclk(clk),
     .s_axis_aresetn(rstn),
-    .s_axis_ready(input_axis_tready_reg),
-    .s_axis_valid(input_axis_tvalid_reg[1]),
-    .s_axis_data(input_axis_tdata_reg[1]),
-    .s_axis_tkeep(input_axis_tkeep_reg[1]),
-    .s_axis_tlast(input_axis_tlast_reg),
+    .s_axis_ready(jesd_axis_tready),
+    .s_axis_valid(jesd_axis_tvalid),
+    .s_axis_data(jesd_axis_tdata),
+    .s_axis_tkeep(),
+    .s_axis_tlast(1'b0),
     .s_axis_empty(),
     .s_axis_almost_empty(),
     .s_axis_full(),
     .s_axis_almost_full(),
     .s_axis_room());
+
+  ////----------------------------------------BER----//
+  //////////////////////////////////////////////////
+
+  wire                       ber_axis_tready;
+  reg                        ber_axis_tvalid;
+  reg  [AXIS_DATA_WIDTH-1:0] ber_axis_tdata;
+
+  reg ber_enable;
+
+  always @(posedge clk)
+  begin
+    ber_enable <= start_app && ber_test;
+  end
+
+  ber_tester_rx #(
+    .IF_COUNT(IF_COUNT),
+    .PORTS_PER_IF(PORTS_PER_IF),
+    .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH)
+  ) ber_tester_rx_inst (
+    .clk(clk),
+    .rstn(rstn),
+    .ber_test(ber_enable),
+    .reset_ber(reset_ber),
+    .total_bits(total_bits),
+    .error_bits_total(error_bits_total),
+    .out_of_sync_total(out_of_sync_total),
+    .s_axis_output_tdata(ber_axis_tdata),
+    .s_axis_output_tvalid(ber_axis_tvalid),
+    .s_axis_output_tready(ber_axis_tready));
+
+  ////----------------------------------------Datapath switch----//
+  //////////////////////////////////////////////////
+
+  always @(*)
+  begin
+    if (!ber_test) begin
+      jesd_axis_tvalid = input_axis_tvalid_reg[1];
+      jesd_axis_tdata = buffer_axis_tdata_reg;
+
+      ber_axis_tvalid = 1'b0;
+      ber_axis_tdata = {AXIS_DATA_WIDTH{1'b0}};
+
+      input_axis_tready_reg = jesd_axis_tready;
+    end else begin
+      jesd_axis_tvalid = 1'b0;
+      jesd_axis_tdata = {AXIS_DATA_WIDTH{1'b0}};
+
+      ber_axis_tvalid = input_axis_tvalid_reg[1];
+      ber_axis_tdata = buffer_axis_tdata_reg;
+
+      input_axis_tready_reg = ber_axis_tready;
+    end
+  end
 
 endmodule

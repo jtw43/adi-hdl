@@ -70,7 +70,6 @@ module application_regmap #(
   output reg                             start_app,
   output reg                             start_counter_reg,
   input  wire [31:0]                     counter_reg,
-  output reg  [15:0]                     packet_size,
 
   // Ethernet header
   output reg  [48-1:0]                   ethernet_destination_MAC,
@@ -133,8 +132,6 @@ module application_regmap #(
       start_counter_reg <= 1'b0;
       // Data generator
       start_app <= 1'b0;
-      // Packetizer
-      packet_size <= 16'd1024;
       // Ethernet header
       ethernet_destination_MAC <= 48'hB83FD22A0BF1;
       ethernet_source_MAC <= 48'h000A35000102;
@@ -171,8 +168,6 @@ module application_regmap #(
           'h2: start_counter_reg <= up_wdata[0];
           // Data generator
           'h5: start_app <= up_wdata[0];
-          // Packetizer
-          'h6: packet_size <= up_wdata[15:0];
           // Ethernet header
           'h7: ethernet_destination_MAC[48-1:32] <= up_wdata[16-1:0];
           'h8: ethernet_destination_MAC[31:0] <= up_wdata;
@@ -217,8 +212,6 @@ module application_regmap #(
           'h4: up_rdata <= counter_reg;
           // Data generator
           'h5: up_rdata <= {{31{1'b0}}, start_app};
-          // Packetizer
-          'h6: up_rdata <= {{16{1'b0}}, packet_size};
           // Ethernet header
           'h7: up_rdata <= {{16{1'b0}}, ethernet_destination_MAC[48-1:32]};
           'h8: up_rdata <= ethernet_destination_MAC[31:0];

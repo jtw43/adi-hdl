@@ -43,59 +43,35 @@ module ber_tester_tx #(
   parameter IF_COUNT = 1,
   parameter PORTS_PER_IF = 1,
 
-  // Ethernet interface configuration (direct, async)
   parameter AXIS_DATA_WIDTH = 512,
-  parameter AXIS_KEEP_WIDTH = AXIS_DATA_WIDTH/8,
-  parameter AXIS_TX_USER_WIDTH = 17
+  parameter AXIS_KEEP_WIDTH = AXIS_DATA_WIDTH/8
 ) (
+
+  input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          clk,
+  input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          rstn,
 
   input  wire                                                      ber_test,
   input  wire                                                      insert_bit_error,
 
-  // Ethernet (direct MAC interface - lowest latency raw traffic)
-  input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          direct_tx_clk,
-  input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          direct_tx_rst,
-
-  input  wire [IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH-1:0]          s_axis_direct_tx_tdata,
-  input  wire [IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH-1:0]          s_axis_direct_tx_tkeep,
-  input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          s_axis_direct_tx_tvalid,
-  output reg  [IF_COUNT*PORTS_PER_IF-1:0]                          s_axis_direct_tx_tready,
-  input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          s_axis_direct_tx_tlast,
-  input  wire [IF_COUNT*PORTS_PER_IF*AXIS_TX_USER_WIDTH-1:0]       s_axis_direct_tx_tuser,
-
-  output reg  [IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH-1:0]          m_axis_direct_tx_tdata,
-  output reg  [IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH-1:0]          m_axis_direct_tx_tkeep,
-  output reg  [IF_COUNT*PORTS_PER_IF-1:0]                          m_axis_direct_tx_tvalid,
-  input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          m_axis_direct_tx_tready,
-  output reg  [IF_COUNT*PORTS_PER_IF-1:0]                          m_axis_direct_tx_tlast,
-  output reg  [IF_COUNT*PORTS_PER_IF*AXIS_TX_USER_WIDTH-1:0]       m_axis_direct_tx_tuser
+  output reg  [IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH-1:0]          m_axis_output_tdata,
+  output reg  [IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH-1:0]          m_axis_output_tkeep,
+  output reg  [IF_COUNT*PORTS_PER_IF-1:0]                          m_axis_output_tvalid,
+  input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          m_axis_output_tready
 );
 
-  wire direct_tx_rstn;
-
-  assign direct_tx_rstn = ~direct_tx_rst;
-
-  // ber_test CDC
-  wire ber_test_cdc;
-
-  sync_bits #(
-    .NUM_OF_BITS(1)
-  ) sync_bits_ber_test (
-    .in_bits(ber_test),
-    .out_resetn(direct_tx_rstn),
-    .out_clk(direct_tx_clk),
-    .out_bits(ber_test_cdc)
-  );
+  localparam DATA_WIDTH = IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH;
+  localparam KEEP_WIDTH = IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH;
 
   // PRBS instances
-  reg prbs_ready;
-
   localparam PRBS_DATA_WIDTH = 64;
   localparam PRBS_POLYNOMIAL_WIDTH = 48;
-  localparam PRBS_INST = IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH/PRBS_DATA_WIDTH;
+  localparam PRBS_INST = DATA_WIDTH/PRBS_DATA_WIDTH;
 
-  wire [IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH-1:0] prbs_data;
-  wire [PRBS_INST-1:0]                             prbs_valid;
+  wire prbs_ready;
+  wire [DATA_WIDTH-1:0] prbs_data;
+  wire [PRBS_INST-1:0]  prbs_valid;
+
+  assign prbs_ready = m_axis_output_tready;
 
   genvar i;
 
@@ -107,9 +83,9 @@ module ber_tester_tx #(
         .DATA_WIDTH(PRBS_DATA_WIDTH),
         .POLYNOMIAL_WIDTH(PRBS_POLYNOMIAL_WIDTH)
       ) prbs_gen_inst (
-        .clk(direct_tx_clk),
-        .rstn(direct_tx_rstn),
-        .init(~ber_test_cdc),
+        .clk(clk),
+        .rstn(rstn),
+        .init(~ber_test),
         .input_ready(prbs_ready),
         .output_data(prbs_data[i*PRBS_DATA_WIDTH +: PRBS_DATA_WIDTH]),
         .output_valid(prbs_valid[i]),
@@ -125,9 +101,9 @@ module ber_tester_tx #(
   reg insert_bit_error_old;
   reg insert_bit_error_valid;
 
-  always @(posedge direct_tx_clk)
+  always @(posedge clk)
   begin
-    if (!direct_tx_rstn) begin
+    if (!rstn) begin
       insert_bit_error_old <= 1'b0;
       insert_bit_error_valid <= 1'b0;
     end else begin
@@ -143,17 +119,17 @@ module ber_tester_tx #(
   end
 
   // insertion place randomization
-  wire [$clog2(IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH)-1:0] insertion_place;
+  wire [$clog2(DATA_WIDTH)-1:0] insertion_place;
 
-  wire [IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH-1:0] prbs_data_post;
+  wire [DATA_WIDTH-1:0] prbs_data_post;
 
   prbs_gen #(
-    .DATA_WIDTH($clog2(IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH)),
+    .DATA_WIDTH($clog2(DATA_WIDTH)),
     .POLYNOMIAL_WIDTH(15)
   ) insertion_place_prbs_inst (
-    .clk(direct_tx_clk),
-    .rstn(direct_tx_rstn),
-    .init(~ber_test_cdc),
+    .clk(clk),
+    .rstn(rstn),
+    .init(~ber_test),
     .input_ready(insert_bit_error_valid),
     .output_data(insertion_place),
     .output_valid(),
@@ -164,46 +140,11 @@ module ber_tester_tx #(
 
   assign prbs_data_post = (insert_bit_error_valid) ? prbs_data^(1'b1 << insertion_place) : prbs_data;
 
-  // Datapath switch
-  reg datapath_switch; // 0 - OS
-                       // 1 - BER
-
-  always @(posedge direct_tx_clk)
-  begin
-    if (direct_tx_rst) begin
-      datapath_switch <= 1'b0;
-    end else begin
-      if (ber_test_cdc && (!s_axis_direct_tx_tvalid || (s_axis_direct_tx_tvalid && s_axis_direct_tx_tready && s_axis_direct_tx_tlast))) begin
-        datapath_switch <= 1'b1;
-      end else if (!ber_test_cdc) begin
-        datapath_switch <= 1'b0;
-      end
-    end
-  end
-
   always @(*)
   begin
-    if (!datapath_switch) begin
-      m_axis_direct_tx_tdata = s_axis_direct_tx_tdata;
-      m_axis_direct_tx_tkeep = s_axis_direct_tx_tkeep;
-      m_axis_direct_tx_tvalid = s_axis_direct_tx_tvalid;
-      m_axis_direct_tx_tlast = s_axis_direct_tx_tlast;
-      m_axis_direct_tx_tuser = s_axis_direct_tx_tuser;
-
-      s_axis_direct_tx_tready = m_axis_direct_tx_tready;
-
-      prbs_ready = 1'b0;
-    end else begin
-      m_axis_direct_tx_tdata = prbs_data_post;
-      m_axis_direct_tx_tkeep = {IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH{1'b1}};
-      m_axis_direct_tx_tvalid = prbs_valid[0];
-      m_axis_direct_tx_tlast = 1'b1;
-      m_axis_direct_tx_tuser = {IF_COUNT*PORTS_PER_IF*AXIS_TX_USER_WIDTH{1'b0}};
-
-      s_axis_direct_tx_tready = 1'b0;
-
-      prbs_ready = m_axis_direct_tx_tready;
-    end
+    m_axis_output_tdata = prbs_data_post;
+    m_axis_output_tkeep = {KEEP_WIDTH{1'b1}};
+    m_axis_output_tvalid = prbs_valid[0];
   end
 
 endmodule

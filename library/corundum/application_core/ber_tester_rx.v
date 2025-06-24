@@ -44,10 +44,11 @@ module ber_tester_rx #(
   parameter PORTS_PER_IF = 1,
 
   // Ethernet interface configuration (direct, async)
-  parameter AXIS_DATA_WIDTH = 512,
-  parameter AXIS_KEEP_WIDTH = AXIS_DATA_WIDTH/8,
-  parameter AXIS_RX_USER_WIDTH = 17
+  parameter AXIS_DATA_WIDTH = 512
 ) (
+
+  input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          clk,
+  input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          rstn,
 
   input  wire                                                      ber_test,
   input  wire                                                      reset_ber,
@@ -56,65 +57,32 @@ module ber_tester_rx #(
   output reg  [63:0]                                               error_bits_total,
   output reg  [31:0]                                               out_of_sync_total,
 
-  // Ethernet (direct MAC interface - lowest latency raw traffic)
-  input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          direct_rx_clk,
-  input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          direct_rx_rst,
-
-  input  wire [IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH-1:0]          s_axis_direct_rx_tdata,
-  input  wire [IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH-1:0]          s_axis_direct_rx_tkeep,
-  input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          s_axis_direct_rx_tvalid,
-  output reg  [IF_COUNT*PORTS_PER_IF-1:0]                          s_axis_direct_rx_tready,
-  input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          s_axis_direct_rx_tlast,
-  input  wire [IF_COUNT*PORTS_PER_IF*AXIS_RX_USER_WIDTH-1:0]       s_axis_direct_rx_tuser,
-
-  output reg  [IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH-1:0]          m_axis_direct_rx_tdata,
-  output reg  [IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH-1:0]          m_axis_direct_rx_tkeep,
-  output reg  [IF_COUNT*PORTS_PER_IF-1:0]                          m_axis_direct_rx_tvalid,
-  input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          m_axis_direct_rx_tready,
-  output reg  [IF_COUNT*PORTS_PER_IF-1:0]                          m_axis_direct_rx_tlast,
-  output reg  [IF_COUNT*PORTS_PER_IF*AXIS_RX_USER_WIDTH-1:0]       m_axis_direct_rx_tuser
+  input  wire [IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH-1:0]          s_axis_output_tdata,
+  input  wire [IF_COUNT*PORTS_PER_IF-1:0]                          s_axis_output_tvalid,
+  output reg  [IF_COUNT*PORTS_PER_IF-1:0]                          s_axis_output_tready
 );
 
   localparam DATA_WIDTH = IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH;
-  localparam KEEP_WIDTH = IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH;
-  localparam RX_USER_WIDTH = IF_COUNT*PORTS_PER_IF*AXIS_RX_USER_WIDTH;
 
-  wire direct_rx_rstn;
-  wire ber_test_cdc;
+  localparam PRBS_DATA_WIDTH = 64;
+  localparam PRBS_POLYNOMIAL_WIDTH = 48;
+  localparam PRBS_INST = DATA_WIDTH/PRBS_DATA_WIDTH;
+  localparam DATA_WIDTH_2 = 2**$clog2(PRBS_INST);
 
-  assign direct_rx_rstn = ~direct_rx_rst;
-
-  sync_bits #(
-    .NUM_OF_BITS(1)
-  ) sync_bits_ber_test (
-    .in_bits(ber_test),
-    .out_resetn(direct_rx_rstn),
-    .out_clk(direct_rx_clk),
-    .out_bits(ber_test_cdc)
-  );
-
-  reg ber_test_cdc_old;
   reg init_prbs;
 
-  always @(posedge direct_rx_clk)
+  always @(posedge clk)
   begin
-    if (!direct_rx_rstn) begin
-      ber_test_cdc_old <= 1'b0;
+    if (!rstn) begin
       init_prbs <= 1'b0;
     end else begin
-      ber_test_cdc_old <= ber_test_cdc;
-      if (!ber_test_cdc_old && ber_test_cdc) begin
+      if (~ber_test || reset_ber) begin
         init_prbs <= 1'b1;
       end else begin
         init_prbs <= 1'b0;
       end
     end
   end
-
-  localparam PRBS_DATA_WIDTH = 64;
-  localparam PRBS_POLYNOMIAL_WIDTH = 48;
-  localparam PRBS_INST = DATA_WIDTH/PRBS_DATA_WIDTH;
-  localparam DATA_WIDTH_2 = 2**$clog2(PRBS_INST);
 
   reg  [DATA_WIDTH-1:0]                                  prbs_data;
   reg                                                    prbs_valid;
@@ -144,8 +112,8 @@ module ber_tester_rx #(
         .POLYNOMIAL_WIDTH(PRBS_POLYNOMIAL_WIDTH),
         .OUT_OF_SYNC_THRESHOLD(16)
       ) prbs_mon_inst (
-        .clk(direct_rx_clk),
-        .rstn(direct_rx_rstn),
+        .clk(clk),
+        .rstn(rstn),
         .init(init_prbs),
         .input_data(prbs_data[i*PRBS_DATA_WIDTH +: PRBS_DATA_WIDTH]),
         .input_valid(prbs_valid),
@@ -163,9 +131,9 @@ module ber_tester_rx #(
     integer j, k;
     integer new_block, last_block;
 
-    always @(posedge direct_rx_clk)
+    always @(posedge clk)
     begin
-      if (direct_rx_rst) begin
+      if (!rstn) begin
         for (j = 0; j < DATA_WIDTH_2-1; j = j + 1) begin
           out_of_sync_counter[j] <= {$clog2(PRBS_INST+1){1'b0}};
           bit_error_counter[j] <= {$clog2(PRBS_DATA_WIDTH+PRBS_INST+1){1'b0}};
@@ -199,9 +167,9 @@ module ber_tester_rx #(
 
   endgenerate
 
-  always @(posedge direct_rx_clk)
+  always @(posedge clk)
   begin
-    if (direct_rx_rst) begin
+    if (!rstn) begin
       total_bits <= {64{1'b0}};
       out_of_sync_total <= {32{1'b0}};
       error_bits_total <= {64{1'b0}};
@@ -220,48 +188,12 @@ module ber_tester_rx #(
     end
   end
 
-  // Datapath switch
-  reg datapath_switch; // 0 - OS
-                       // 1 - BER
-
-  always @(posedge direct_rx_clk)
-  begin
-    if (direct_rx_rst) begin
-      datapath_switch <= 1'b0;
-    end else begin
-      if (ber_test_cdc && (!s_axis_direct_rx_tvalid || (s_axis_direct_rx_tvalid && s_axis_direct_rx_tready && s_axis_direct_rx_tlast))) begin
-        datapath_switch <= 1'b1;
-      end else if (!ber_test_cdc) begin
-        datapath_switch <= 1'b0;
-      end
-    end
-  end
-
   always @(*)
   begin
-    if (!datapath_switch) begin
-      m_axis_direct_rx_tdata = s_axis_direct_rx_tdata;
-      m_axis_direct_rx_tkeep = s_axis_direct_rx_tkeep;
-      m_axis_direct_rx_tvalid = s_axis_direct_rx_tvalid;
-      m_axis_direct_rx_tlast = s_axis_direct_rx_tlast;
-      m_axis_direct_rx_tuser = s_axis_direct_rx_tuser;
+    prbs_valid = s_axis_output_tvalid;
+    prbs_data = s_axis_output_tdata;
 
-      s_axis_direct_rx_tready = m_axis_direct_rx_tready;
-
-      prbs_valid = 1'b0;
-      prbs_data = {DATA_WIDTH{1'b0}};
-    end else begin
-      m_axis_direct_rx_tdata = {DATA_WIDTH{1'b0}};
-      m_axis_direct_rx_tkeep = {KEEP_WIDTH{1'b0}};
-      m_axis_direct_rx_tvalid = 1'b0;
-      m_axis_direct_rx_tlast = 1'b0;
-      m_axis_direct_rx_tuser = {RX_USER_WIDTH{1'b0}};
-
-      s_axis_direct_rx_tready = 1'b1;
-
-      prbs_valid = s_axis_direct_rx_tvalid;
-      prbs_data = s_axis_direct_rx_tdata;
-    end
+    s_axis_output_tready = 1'b1;
   end
 
 endmodule

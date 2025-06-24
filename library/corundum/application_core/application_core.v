@@ -120,8 +120,9 @@ module application_core #
   parameter INPUT_SAMPLE_DATA_WIDTH = 16,
 
   // Output stream
-  parameter OUTPUT_WIDTH = 2048,
-  parameter OUTPUT_CHANNELS = 4
+  parameter OUTPUT_CHANNELS = 4,
+  parameter OUTPUT_SAMPLES_PER_CHANNEL = 16,
+  parameter OUTPUT_SAMPLE_DATA_WIDTH = 16
 )
 (
   input  wire                                           clk,
@@ -539,9 +540,9 @@ module application_core #
   input  wire                                           output_clk,
   input  wire                                           output_rstn,
 
-  output wire [OUTPUT_WIDTH-1:0]                        output_axis_tdata,
-  output wire                                           output_axis_tvalid,
-  input  wire                                           output_axis_tready,
+  output wire [OUTPUT_CHANNELS*OUTPUT_SAMPLES_PER_CHANNEL*OUTPUT_SAMPLE_DATA_WIDTH-1:0] output_axis_tdata,
+  output wire                                                                           output_axis_tvalid,
+  input  wire                                                                           output_axis_tready,
 
   input  wire [OUTPUT_CHANNELS-1:0]                     output_enable
 );
@@ -602,6 +603,13 @@ module application_core #
   // Sample count per channel
   wire [15:0] sample_count;
 
+  wire        ber_test;
+  wire        reset_ber;
+  wire        insert_bit_error;
+  wire [63:0] total_bits;
+  wire [63:0] error_bits_total;
+  wire [31:0] out_of_sync_total;
+
   application_tx #(
     .IF_COUNT(IF_COUNT),
     .PORTS_PER_IF(PORTS_PER_IF),
@@ -656,7 +664,10 @@ module application_core #
     .udp_length(udp_length),
     .udp_checksum(udp_checksum),
 
-    .sample_count(sample_count));
+    .sample_count(sample_count),
+
+    .ber_test(ber_test),
+    .insert_bit_error(insert_bit_error));
 
   application_rx #(
     .IF_COUNT(IF_COUNT),
@@ -664,8 +675,9 @@ module application_core #
     .AXIS_DATA_WIDTH(AXIS_SYNC_DATA_WIDTH),
     .AXIS_KEEP_WIDTH(AXIS_SYNC_KEEP_WIDTH),
     .AXIS_RX_USER_WIDTH(AXIS_SYNC_RX_USER_WIDTH),
-    .OUTPUT_WIDTH(OUTPUT_WIDTH),
-    .CHANNELS(OUTPUT_CHANNELS)
+    .CHANNELS(OUTPUT_CHANNELS),
+    .SAMPLES_PER_CHANNEL(OUTPUT_SAMPLES_PER_CHANNEL),
+    .SAMPLE_DATA_WIDTH(OUTPUT_SAMPLE_DATA_WIDTH)
   ) application_rx_inst (
     .clk(clk),
     .rstn(rstn),
@@ -690,7 +702,6 @@ module application_core #
     .output_enable(output_enable),
 
     .start_app(start_app),
-    .packet_size(packet_size),
     .ethernet_destination_MAC(ethernet_destination_MAC),
     .ethernet_source_MAC(ethernet_source_MAC),
     .ethernet_type(ethernet_type),
@@ -706,109 +717,21 @@ module application_core #
     .ip_destination_IP_address(ip_destination_IP_address),
     .udp_source(udp_source),
     .udp_destination(udp_destination),
-    .udp_checksum(udp_checksum));
+    .udp_checksum(udp_checksum),
 
-  wire        ber_test;
-  wire        reset_ber;
-  wire        reset_ber_cdc;
-  wire        insert_bit_error;
-  wire        insert_bit_error_cdc;
-  wire [63:0] total_bits;
-  wire [63:0] error_bits_total;
-  wire [31:0] out_of_sync_total;
+    .sample_count(sample_count),
 
-  sync_event #(
-    .NUM_OF_EVENTS(1)
-  ) sync_event_reset_ber (
-    .in_clk(clk),
-    .in_event(reset_ber),
-    .out_clk(direct_rx_clk),
-    .out_event(reset_ber_cdc));
-
-  sync_event #(
-    .NUM_OF_EVENTS(1)
-  ) sync_event_insert_bit_error (
-    .in_clk(clk),
-    .in_event(insert_bit_error),
-    .out_clk(direct_tx_clk),
-    .out_event(insert_bit_error_cdc));
-
-  ber_tester #(
-    .IF_COUNT(IF_COUNT),
-    .PORTS_PER_IF(PORTS_PER_IF),
-    .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH),
-    .AXIS_KEEP_WIDTH(AXIS_KEEP_WIDTH),
-    .AXIS_TX_USER_WIDTH(AXIS_TX_USER_WIDTH),
-    .AXIS_RX_USER_WIDTH(AXIS_RX_USER_WIDTH)
-  ) ber_tester_inst (
     .ber_test(ber_test),
-    .reset_ber(reset_ber_cdc),
-    .insert_bit_error(insert_bit_error_cdc),
+    .reset_ber(reset_ber),
     .total_bits(total_bits),
     .error_bits_total(error_bits_total),
-    .out_of_sync_total(out_of_sync_total),
-    .direct_tx_clk(direct_tx_clk),
-    .direct_tx_rst(direct_tx_rst),
-    .s_axis_direct_tx_tdata(s_axis_direct_tx_tdata),
-    .s_axis_direct_tx_tkeep(s_axis_direct_tx_tkeep),
-    .s_axis_direct_tx_tvalid(s_axis_direct_tx_tvalid),
-    .s_axis_direct_tx_tready(s_axis_direct_tx_tready),
-    .s_axis_direct_tx_tlast(s_axis_direct_tx_tlast),
-    .s_axis_direct_tx_tuser(s_axis_direct_tx_tuser),
-    .m_axis_direct_tx_tdata(m_axis_direct_tx_tdata),
-    .m_axis_direct_tx_tkeep(m_axis_direct_tx_tkeep),
-    .m_axis_direct_tx_tvalid(m_axis_direct_tx_tvalid),
-    .m_axis_direct_tx_tready(m_axis_direct_tx_tready),
-    .m_axis_direct_tx_tlast(m_axis_direct_tx_tlast),
-    .m_axis_direct_tx_tuser(m_axis_direct_tx_tuser),
-    .direct_rx_clk(direct_rx_clk),
-    .direct_rx_rst(direct_rx_rst),
-    .s_axis_direct_rx_tdata(s_axis_direct_rx_tdata),
-    .s_axis_direct_rx_tkeep(s_axis_direct_rx_tkeep),
-    .s_axis_direct_rx_tvalid(s_axis_direct_rx_tvalid),
-    .s_axis_direct_rx_tready(s_axis_direct_rx_tready),
-    .s_axis_direct_rx_tlast(s_axis_direct_rx_tlast),
-    .s_axis_direct_rx_tuser(s_axis_direct_rx_tuser),
-    .m_axis_direct_rx_tdata(m_axis_direct_rx_tdata),
-    .m_axis_direct_rx_tkeep(m_axis_direct_rx_tkeep),
-    .m_axis_direct_rx_tvalid(m_axis_direct_rx_tvalid),
-    .m_axis_direct_rx_tready(m_axis_direct_rx_tready),
-    .m_axis_direct_rx_tlast(m_axis_direct_rx_tlast),
-    .m_axis_direct_rx_tuser(m_axis_direct_rx_tuser));
+    .out_of_sync_total(out_of_sync_total));
 
   ////----------------------------------------AXI Interface-----------------//
   //////////////////////////////////////////////////
 
   wire                            start_counter_reg;
   reg  [31:0]                     counter_reg;
-
-  wire [63:0] total_bits_cdc;
-  wire [63:0] error_bits_total_cdc;
-  wire [31:0] out_of_sync_total_cdc;
-
-  sync_data #(
-    .NUM_OF_BITS(64)
-  ) sync_data_total_bits (
-    .in_clk(direct_rx_clk),
-    .in_data(total_bits),
-    .out_clk(clk),
-    .out_data(total_bits_cdc));
-
-  sync_data #(
-    .NUM_OF_BITS(64)
-  ) sync_data_error_bits_total (
-    .in_clk(direct_rx_clk),
-    .in_data(error_bits_total),
-    .out_clk(clk),
-    .out_data(error_bits_total_cdc));
-
-  sync_data #(
-    .NUM_OF_BITS(32)
-  ) sync_data_out_of_sync_total (
-    .in_clk(direct_rx_clk),
-    .in_data(out_of_sync_total),
-    .out_clk(clk),
-    .out_data(out_of_sync_total_cdc));
 
   application_regmap #(
     .AXIL_CTRL_DATA_WIDTH(AXIL_CTRL_DATA_WIDTH),
@@ -841,7 +764,6 @@ module application_core #
     .start_app(start_app),
     .start_counter_reg(start_counter_reg),
     .counter_reg(counter_reg),
-    .packet_size(packet_size),
 
     .ethernet_destination_MAC(ethernet_destination_MAC),
     .ethernet_source_MAC(ethernet_source_MAC),
@@ -866,9 +788,9 @@ module application_core #
     .ber_test(ber_test),
     .reset_ber(reset_ber),
     .insert_bit_error(insert_bit_error),
-    .total_bits(total_bits_cdc),
-    .error_bits_total(error_bits_total_cdc),
-    .out_of_sync_total(out_of_sync_total_cdc),
+    .total_bits(total_bits),
+    .error_bits_total(error_bits_total),
+    .out_of_sync_total(out_of_sync_total),
 
     .sample_count(sample_count));
 
@@ -965,10 +887,24 @@ module application_core #
   assign data_dma_ram_rd_resp_valid = data_dma_ram_rd_cmd_valid;
 
   // Ethernet (direct MAC interface - lowest latency raw traffic)
+  assign m_axis_direct_tx_tdata = s_axis_direct_tx_tdata;
+  assign m_axis_direct_tx_tkeep = s_axis_direct_tx_tkeep;
+  assign m_axis_direct_tx_tvalid = s_axis_direct_tx_tvalid;
+  assign s_axis_direct_tx_tready = m_axis_direct_tx_tready;
+  assign m_axis_direct_tx_tlast = s_axis_direct_tx_tlast;
+  assign m_axis_direct_tx_tuser = s_axis_direct_tx_tuser;
+
   assign m_axis_direct_tx_cpl_ts = s_axis_direct_tx_cpl_ts;
   assign m_axis_direct_tx_cpl_tag = s_axis_direct_tx_cpl_tag;
   assign m_axis_direct_tx_cpl_valid = s_axis_direct_tx_cpl_valid;
   assign s_axis_direct_tx_cpl_ready = m_axis_direct_tx_cpl_ready;
+
+  assign m_axis_direct_rx_tdata = s_axis_direct_rx_tdata;
+  assign m_axis_direct_rx_tkeep = s_axis_direct_rx_tkeep;
+  assign m_axis_direct_rx_tvalid = s_axis_direct_rx_tvalid;
+  assign s_axis_direct_rx_tready = m_axis_direct_rx_tready;
+  assign m_axis_direct_rx_tlast = s_axis_direct_rx_tlast;
+  assign m_axis_direct_rx_tuser = s_axis_direct_rx_tuser;
 
   // Ethernet (synchronous MAC interface - low latency raw traffic)
   assign m_axis_sync_tx_cpl_ts = s_axis_sync_tx_cpl_ts;
