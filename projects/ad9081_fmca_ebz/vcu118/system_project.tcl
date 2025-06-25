@@ -61,6 +61,9 @@ adi_project_files ad9081_fmca_ebz_vcu118 [list \
   "../../../library/common/ad_3w_spi.v"\
   "$ad_hdl_dir/library/common/ad_iobuf.v" \
   "$ad_hdl_dir/projects/common/vcu118/vcu118_system_constr.xdc" \
+  "$ad_hdl_dir/library/util_cdc/cdc_constr_async.tcl" \
+  "$ad_hdl_dir/library/util_cdc/cdc_constr.tcl" \
+  "timing_constr.tcl" \
 ]
 
 if {[get_env_param CORUNDUM 0] == 1} {
@@ -93,6 +96,8 @@ if {[get_env_param CORUNDUM 0] == 1} {
 # since at that stage the submodules are not stiched together yet
 if {$ADI_USE_OOC_SYNTHESIS == 1} {
   set_property used_in_synthesis false [get_files timing_constr.xdc]
+  set_property used_in_synthesis false [get_files $ad_hdl_dir/library/util_cdc/cdc_constr.tcl]
+  set_property used_in_synthesis false [get_files timing_constr.tcl]
 }
 
 adi_project_run ad9081_fmca_ebz_vcu118

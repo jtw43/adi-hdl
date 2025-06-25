@@ -7,6 +7,7 @@
 PROJECT_NAME := ad9081_fmca_ebz_vcu118
 
 M_DEPS += timing_constr.xdc
+M_DEPS += timing_constr.tcl
 M_DEPS += ../../scripts/adi_pd.tcl
 M_DEPS += ../../common/xilinx/data_offload_bd.tcl
 M_DEPS += ../../common/xilinx/dacfifo_bd.tcl
@@ -20,7 +21,7 @@ M_DEPS += ../../../library/jesd204/scripts/jesd204.tcl
 M_DEPS += ../../../library/common/ad_iobuf.v
 M_DEPS += ../../../library/common/ad_3w_spi.v
 M_DEPS += ../../../library/axi_tdd/scripts/axi_tdd.tcl
-
+M_DEPS += ../../../library/util_cdc/cdc_constr.tcl
 M_DEPS += ../../../library/corundum/scripts/corundum_vcu118_cfg.tcl
 M_DEPS += ../../../library/corundum/scripts/corundum.tcl
 

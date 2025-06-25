@@ -13,7 +13,7 @@ source $ad_hdl_dir/projects/scripts/adi_board.tcl
 #   Use over-writable parameters from the environment.
 #
 #    e.g.
-#      make RX_JESD_L=4 RX_JESD_M=2 TX_JESD_L=4 TX_JESD_M=2 
+#      make RX_JESD_L=4 RX_JESD_M=2 TX_JESD_L=4 TX_JESD_M=2
 
 # Parameter description:
 #   [RX/TX]_JESD_M : Number of converters per link
@@ -35,6 +35,19 @@ adi_project_files daq2_zcu102 [list \
   "system_constr.xdc"\
   "$ad_hdl_dir/library/common/ad_iobuf.v" \
   "$ad_hdl_dir/projects/common/zcu102/zcu102_system_constr.xdc" ]
+
+add_files -fileset constrs_1 -norecurse [list \
+  "$ad_hdl_dir/library/util_cdc/cdc_constr_async.tcl" \
+  "$ad_hdl_dir/library/util_cdc/cdc_constr.tcl" \
+  "timing_constr.tcl" \
+]
+
+# Avoid critical warning in OOC mode from the clock definitions
+# since at that stage the submodules are not stiched together yet
+if {$ADI_USE_OOC_SYNTHESIS == 1} {
+  set_property used_in_synthesis false [get_files $ad_hdl_dir/library/util_cdc/cdc_constr.tcl]
+  set_property used_in_synthesis false [get_files timing_constr.tcl]
+}
 
 adi_project_run daq2_zcu102
 

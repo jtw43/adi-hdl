@@ -42,7 +42,6 @@ adi_ip_files axi_dmac [list \
   "splitter.v" \
   "response_generator.v" \
   "axi_dmac.v" \
-  "axi_dmac_constr.ttcl" \
   "axi_dmac_pkg_sv.ttcl" \
   "bd/bd.tcl" ]
 
@@ -51,7 +50,6 @@ set_property used_in_synthesis false [get_files ./bd/bd.tcl]
 
 adi_ip_properties axi_dmac
 adi_ip_infer_mm_interfaces axi_dmac
-adi_ip_ttcl axi_dmac "axi_dmac_constr.ttcl"
 adi_ip_sim_ttcl axi_dmac "axi_dmac_pkg_sv.ttcl"
 adi_ip_bd axi_dmac "bd/bd.tcl"
 

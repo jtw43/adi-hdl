@@ -206,14 +206,8 @@ module util_adxcvr_xch #(
   reg     [11:0]  up_addr_int = 'd0;
   reg             up_wr_int = 'd0;
   reg     [15:0]  up_wdata_int = 'd0;
-  reg             up_rx_rst_done_m1 = 'd0;
-  reg             up_rx_rst_done_m2 = 'd0;
-  reg             up_tx_rst_done_m1 = 'd0;
-  reg             up_tx_rst_done_m2 = 'd0;
-  reg     [ 2:0]  rx_rate_m1 = 'd0;
-  reg     [ 2:0]  rx_rate_m2 = 'd0;
-  reg     [ 2:0]  tx_rate_m1 = 'd0;
-  reg     [ 2:0]  tx_rate_m2 = 'd0;
+  wire    [ 2:0]  rx_rate = 'd0;
+  wire    [ 2:0]  tx_rate = 'd0;
 
   // internal signals
 
@@ -322,32 +316,37 @@ module util_adxcvr_xch #(
     end
   end
 
-  assign up_rx_rst_done = up_rx_rst_done_m2;
-  assign up_tx_rst_done = up_tx_rst_done_m2;
+  sync_bits #(
+    .NUM_OF_BITS(1)
+  ) i_sync_bits_up_rx_rst_done (
+    .in_bits (rx_rst_done_s),
+    .out_resetn (1'b1),
+    .out_clk (up_clk),
+    .out_bits (up_rx_rst_done));
 
-  always @(negedge up_rstn or posedge up_clk) begin
-    if (up_rstn == 1'b0) begin
-      up_rx_rst_done_m1 <= 'd0;
-      up_rx_rst_done_m2 <= 'd0;
-      up_tx_rst_done_m1 <= 'd0;
-      up_tx_rst_done_m2 <= 'd0;
-    end else begin
-      up_rx_rst_done_m1 <= rx_rst_done_s;
-      up_rx_rst_done_m2 <= up_rx_rst_done_m1;
-      up_tx_rst_done_m1 <= tx_rst_done_s;
-      up_tx_rst_done_m2 <= up_tx_rst_done_m1;
-    end
-  end
+  sync_bits #(
+    .NUM_OF_BITS(1)
+  ) i_sync_bits_up_tx_rst_done (
+    .in_bits (tx_rst_done_s),
+    .out_resetn (1'b1),
+    .out_clk (up_clk),
+    .out_bits (up_tx_rst_done));
 
-  always @(posedge rx_clk) begin
-    rx_rate_m1 <= up_rx_rate;
-    rx_rate_m2 <= rx_rate_m1;
-  end
+  sync_bits #(
+    .NUM_OF_BITS(3)
+  ) i_sync_bits_rx_rate (
+    .in_bits (up_rx_rate),
+    .out_resetn (1'b1),
+    .out_clk (rx_clk),
+    .out_bits (rx_rate));
 
-  always @(posedge tx_clk) begin
-    tx_rate_m1 <= up_tx_rate;
-    tx_rate_m2 <= tx_rate_m1;
-  end
+  sync_bits #(
+    .NUM_OF_BITS(3)
+  ) i_sync_bits_tx_rate (
+    .in_bits (up_tx_rate),
+    .out_resetn (1'b1),
+    .out_clk (x_clk),
+    .out_bits (tx_rate));
 
   // Rx PRBS interface logic
   wire        rx_prbscntreset;
@@ -915,7 +914,7 @@ module util_adxcvr_xch #(
     .RXPRBSERR (rx_prbserr),
     .RXPRBSSEL (rx_prbssel[2:0]),
     .RXQPIEN (1'h0),
-    .RXRATE (rx_rate_m2),
+    .RXRATE (rx_rate),
     .RXRESETDONE (rx_rst_done_s),
     .RXSLIDE (1'h0),
     .RXSTATUS (),
@@ -977,7 +976,7 @@ module util_adxcvr_xch #(
     .TXQPIBIASEN (1'h0),
     .TXQPISTRONGPDOWN (1'h0),
     .TXQPIWEAKPUP (1'h0),
-    .TXRATE (tx_rate_m2),
+    .TXRATE (tx_rate),
     .TXRESETDONE (tx_rst_done_s),
     .TXSEQUENCE (7'h0),
     .TXSTARTSEQ (1'h0),
@@ -1651,7 +1650,7 @@ module util_adxcvr_xch #(
     .RXQPIEN (1'h0),
     .RXQPISENN (),
     .RXQPISENP (),
-    .RXRATE (rx_rate_m2),
+    .RXRATE (rx_rate),
     .RXRATEDONE (),
     .RXRATEMODE (1'h0),
     .RXRECCLKOUT (),
@@ -1746,7 +1745,7 @@ module util_adxcvr_xch #(
     .TXQPISENP (),
     .TXQPISTRONGPDOWN (1'h0),
     .TXQPIWEAKPUP (1'h0),
-    .TXRATE (tx_rate_m2),
+    .TXRATE (tx_rate),
     .TXRATEDONE (),
     .TXRATEMODE (1'h0),
     .TXRESETDONE (tx_rst_done_s),
@@ -2546,7 +2545,7 @@ module util_adxcvr_xch #(
     .RXQPIEN (1'd0),
     .RXQPISENN (),
     .RXQPISENP (),
-    .RXRATE (rx_rate_m2),
+    .RXRATE (rx_rate),
     .RXRATEDONE (),
     .RXRATEMODE (1'd0),
     .RXRECCLKOUT (),
@@ -2646,7 +2645,7 @@ module util_adxcvr_xch #(
     .TXQPISENN (),
     .TXQPISENP (),
     .TXQPIWEAKPUP (1'd0),
-    .TXRATE (tx_rate_m2),
+    .TXRATE (tx_rate),
     .TXRATEDONE (),
     .TXRATEMODE (1'd0),
     .TXRESETDONE (tx_rst_done_s),
@@ -3339,7 +3338,7 @@ module util_adxcvr_xch #(
       .RXPRBSCNTRESET (rx_prbscntreset),
       .RXPRBSSEL (rx_prbssel),
       .RXPROGDIVRESET (up_rx_rst),
-      .RXRATE (rx_rate_m2),
+      .RXRATE (rx_rate),
       .RXRATEMODE (1'b0),
       .RXSLIDE (1'b0),
       .RXSLIPOUTCLK (1'b0),
@@ -3412,7 +3411,7 @@ module util_adxcvr_xch #(
       .TXPRBSSEL (tx_prbssel),
       .TXPRECURSOR (up_tx_precursor),
       .TXPROGDIVRESET (up_tx_rst),
-      .TXRATE (tx_rate_m2),
+      .TXRATE (tx_rate),
       .TXRATEMODE (1'b0),
       .TXSEQUENCE (7'b0000000),
       .TXSWING (1'b0),

@@ -15,6 +15,8 @@ add_files -fileset [get_filesets sources_1] [list \
   "../../common/up_clock_mon.v" \
   "jesd204_up_common.v" \
   "jesd204_up_sysref.v" \
+  "../../common/ad_rst.v" \
+  "../../xilinx/common/ad_rst_constr.xdc" \
 ]
 
 set_property source_mgmt_mode DisplayOnly [current_project]
