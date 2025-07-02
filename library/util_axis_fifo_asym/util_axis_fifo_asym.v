@@ -269,13 +269,6 @@ module util_axis_fifo_asym #(
 
   endgenerate
 
-  // slave handshake counter
-
-  reg s_axis_tlast_d = 0;
-  always @(posedge s_axis_aclk) begin
-    s_axis_tlast_d <= s_axis_tlast;
-  end
-
   generate
     if (RATIO == 1) begin
       initial begin
