@@ -55,7 +55,7 @@ module util_axis_fifo_asym #(
   output m_axis_tlast,
   output m_axis_empty,
   output m_axis_almost_empty,
-  output [31:0] m_axis_level,
+  output [ADDRESS_WIDTH-1:0] m_axis_level,
 
   input s_axis_aclk,
   input s_axis_aresetn,
