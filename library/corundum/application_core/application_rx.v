@@ -65,12 +65,12 @@ module application_rx #(
   input  wire [IF_COUNT*PORTS_PER_IF-1:0]                     s_axis_sync_rx_tlast,
   input  wire [IF_COUNT*PORTS_PER_IF*AXIS_RX_USER_WIDTH-1:0]  s_axis_sync_rx_tuser,
 
-  output reg  [IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH-1:0]     m_axis_sync_rx_tdata,
-  output reg  [IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH-1:0]     m_axis_sync_rx_tkeep,
-  output reg  [IF_COUNT*PORTS_PER_IF-1:0]                     m_axis_sync_rx_tvalid,
+  output wire [IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH-1:0]     m_axis_sync_rx_tdata,
+  output wire [IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH-1:0]     m_axis_sync_rx_tkeep,
+  output wire [IF_COUNT*PORTS_PER_IF-1:0]                     m_axis_sync_rx_tvalid,
   input  wire [IF_COUNT*PORTS_PER_IF-1:0]                     m_axis_sync_rx_tready,
-  output reg  [IF_COUNT*PORTS_PER_IF-1:0]                     m_axis_sync_rx_tlast,
-  output reg  [IF_COUNT*PORTS_PER_IF*AXIS_RX_USER_WIDTH-1:0]  m_axis_sync_rx_tuser,
+  output wire [IF_COUNT*PORTS_PER_IF-1:0]                     m_axis_sync_rx_tlast,
+  output wire [IF_COUNT*PORTS_PER_IF*AXIS_RX_USER_WIDTH-1:0]  m_axis_sync_rx_tuser,
 
   // Input data
   input  wire                            output_clk,
@@ -284,138 +284,83 @@ module application_rx #(
     ip_header_validation_mask_part,
     ethernet_header_validation_mask_part};
 
-  wire valid;
   wire switch;
+  wire switch_valid;
+  wire valid;
+  wire valid_valid;
 
-  rx_arbiter #(
+  header_checker #(
     .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH),
-    .HEADER_LENGTH(HEADER_LENGTH),
-    .VALIDATION_EN(1)
-  ) rx_arbiter_inst (
+    .HEADER_LENGTH(HEADER_LENGTH)
+  ) header_checker_routing (
     .clk(clk),
     .rstn(rstn),
     .start_app(start_app),
     .header(complete_header),
-    .header_routing_list(complete_header_routing_mask),
-    .header_validation_list(complete_header_validation_mask),
+    .header_list(complete_header_routing_mask),
     .input_axis_tvalid(s_axis_sync_rx_tvalid),
     .input_axis_tready(s_axis_sync_rx_tready),
     .input_axis_tdata(s_axis_sync_rx_tdata),
     .input_axis_tlast(s_axis_sync_rx_tlast),
-    .valid(valid),
-    .switch(switch));
+    .matching(switch),
+    .valid(switch_valid));
+
+  header_checker #(
+    .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH),
+    .HEADER_LENGTH(HEADER_LENGTH)
+  ) header_checker_validation (
+    .clk(clk),
+    .rstn(rstn),
+    .start_app(start_app),
+    .header(complete_header),
+    .header_list(complete_header_validation_mask),
+    .input_axis_tvalid(s_axis_sync_rx_tvalid),
+    .input_axis_tready(s_axis_sync_rx_tready),
+    .input_axis_tdata(s_axis_sync_rx_tdata),
+    .input_axis_tlast(s_axis_sync_rx_tlast),
+    .matching(valid),
+    .valid(valid_valid));
 
   ////----------------------------------------Datapath switch-----------------//
   //////////////////////////////////////////////////
-  reg [IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH-1:0]    axis_sync_rx_tdata_reg;
-  reg [IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH-1:0]    axis_sync_rx_tkeep_reg;
-  reg [IF_COUNT*PORTS_PER_IF-1:0]                    axis_sync_rx_tvalid_reg;
-  reg [IF_COUNT*PORTS_PER_IF-1:0]                    axis_sync_rx_tready_reg;
-  reg [IF_COUNT*PORTS_PER_IF-1:0]                    axis_sync_rx_tlast_reg;
-  reg [IF_COUNT*PORTS_PER_IF*AXIS_RX_USER_WIDTH-1:0] axis_sync_rx_tuser_reg;
 
-  always @(posedge clk)
-  begin
-    if (!rstn) begin
-      axis_sync_rx_tdata_reg <= {IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH{1'b0}};
-      axis_sync_rx_tkeep_reg <= {IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH{1'b0}};
-      axis_sync_rx_tvalid_reg <= {IF_COUNT*PORTS_PER_IF{1'b0}};
-      axis_sync_rx_tlast_reg <= {IF_COUNT*PORTS_PER_IF{1'b0}};
-      axis_sync_rx_tuser_reg <= {IF_COUNT*PORTS_PER_IF*AXIS_RX_USER_WIDTH{1'b0}};
-    end else begin
-      axis_sync_rx_tdata_reg <= s_axis_sync_rx_tdata;
-      axis_sync_rx_tkeep_reg <= s_axis_sync_rx_tkeep;
-      axis_sync_rx_tvalid_reg <= s_axis_sync_rx_tvalid;
-      axis_sync_rx_tlast_reg <= s_axis_sync_rx_tlast;
-      axis_sync_rx_tuser_reg <= s_axis_sync_rx_tuser;
-    end
-  end
+  wire [IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH-1:0]    raw_axis_tdata;
+  wire [IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH-1:0]    raw_axis_tkeep;
+  wire [IF_COUNT*PORTS_PER_IF-1:0]                    raw_axis_tvalid;
+  reg  [IF_COUNT*PORTS_PER_IF-1:0]                    raw_axis_tready;
+  wire [IF_COUNT*PORTS_PER_IF-1:0]                    raw_axis_tlast;
+  wire [IF_COUNT*PORTS_PER_IF*AXIS_RX_USER_WIDTH-1:0] raw_axis_tuser;
 
-  reg [HEADER_LENGTH-1:0] bypass_axis_tdata_reg;
-  reg [HEADER_LENGTH-1:0] bypass_axis_tkeep_reg;
-
-  reg [AXIS_DATA_WIDTH-HEADER_LENGTH-1:0]   temp_axis_tdata_reg;
-  reg [AXIS_KEEP_WIDTH-HEADER_LENGTH/8-1:0] temp_axis_tkeep_reg;
-
-  always @(*)
-  begin
-    bypass_axis_tdata_reg = axis_sync_rx_tdata_reg[HEADER_LENGTH-1:0];
-    bypass_axis_tkeep_reg = axis_sync_rx_tkeep_reg[HEADER_LENGTH/8-1:0];
-  end
-
-  always @(posedge clk)
-  begin
-    temp_axis_tdata_reg <= axis_sync_rx_tdata_reg[AXIS_DATA_WIDTH-1:HEADER_LENGTH];
-    temp_axis_tkeep_reg <= axis_sync_rx_tkeep_reg[AXIS_DATA_WIDTH/8-1:HEADER_LENGTH/8];
-  end
-
-  reg [AXIS_DATA_WIDTH-1:0] buffer_axis_tdata_reg;
-  reg [AXIS_KEEP_WIDTH-1:0] buffer_axis_tkeep_reg;
-
-  reg [IF_COUNT*PORTS_PER_IF-1:0] input_axis_tvalid_reg [1:0];
-  reg [IF_COUNT*PORTS_PER_IF-1:0] input_axis_tready_reg;
-  reg [IF_COUNT*PORTS_PER_IF-1:0] input_axis_tlast_reg;
-
-  always @(posedge clk)
-  begin
-    if (!rstn) begin
-      m_axis_sync_rx_tdata <= {IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH{1'b0}};
-      m_axis_sync_rx_tkeep <= {IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH{1'b0}};
-      m_axis_sync_rx_tvalid <= {IF_COUNT*PORTS_PER_IF{1'b0}};
-      axis_sync_rx_tready_reg <= {IF_COUNT*PORTS_PER_IF{1'b0}};
-      m_axis_sync_rx_tlast <= {IF_COUNT*PORTS_PER_IF{1'b0}};
-      m_axis_sync_rx_tuser <= {IF_COUNT*PORTS_PER_IF*AXIS_RX_USER_WIDTH{1'b0}};
-    end else begin
-      if (!switch) begin
-        m_axis_sync_rx_tdata <= axis_sync_rx_tdata_reg;
-        m_axis_sync_rx_tkeep <= axis_sync_rx_tkeep_reg;
-        m_axis_sync_rx_tvalid <= axis_sync_rx_tvalid_reg;
-        m_axis_sync_rx_tlast <= axis_sync_rx_tlast_reg;
-        m_axis_sync_rx_tuser <= axis_sync_rx_tuser_reg;
-
-        buffer_axis_tdata_reg <= {IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH{1'b0}};
-        buffer_axis_tkeep_reg <= {IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH{1'b0}};
-
-        input_axis_tvalid_reg[0] <= {IF_COUNT*PORTS_PER_IF{1'b0}};
-        input_axis_tvalid_reg[1] <= {IF_COUNT*PORTS_PER_IF{1'b0}};
-
-        input_axis_tlast_reg <= {IF_COUNT*PORTS_PER_IF{1'b0}};
-
-        axis_sync_rx_tready_reg <= m_axis_sync_rx_tready;
-      end else begin
-        m_axis_sync_rx_tdata <= {IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH{1'b0}};
-        m_axis_sync_rx_tkeep <= {IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH{1'b0}};
-        m_axis_sync_rx_tvalid <= {IF_COUNT*PORTS_PER_IF{1'b0}};
-        m_axis_sync_rx_tlast <= {IF_COUNT*PORTS_PER_IF{1'b0}};
-        m_axis_sync_rx_tuser <= {IF_COUNT*PORTS_PER_IF*AXIS_RX_USER_WIDTH{1'b0}};
-
-        if (!valid) begin
-          buffer_axis_tdata_reg <= {IF_COUNT*PORTS_PER_IF*AXIS_DATA_WIDTH{1'b0}};
-          buffer_axis_tkeep_reg <= {IF_COUNT*PORTS_PER_IF*AXIS_KEEP_WIDTH{1'b0}};
-
-          input_axis_tvalid_reg[0] <= {IF_COUNT*PORTS_PER_IF{1'b0}};
-          input_axis_tvalid_reg[1] <= {IF_COUNT*PORTS_PER_IF{1'b0}};
-
-          input_axis_tlast_reg <= {IF_COUNT*PORTS_PER_IF{1'b0}};
-
-          axis_sync_rx_tready_reg <= {IF_COUNT*PORTS_PER_IF{1'b1}};
-        end else begin
-          // header extraction
-          buffer_axis_tdata_reg <= {bypass_axis_tdata_reg, temp_axis_tdata_reg};
-          buffer_axis_tkeep_reg <= {bypass_axis_tkeep_reg, temp_axis_tkeep_reg};
-
-          input_axis_tvalid_reg[0] <= axis_sync_rx_tvalid_reg;
-          input_axis_tvalid_reg[1] <= input_axis_tvalid_reg[0] && !input_axis_tlast_reg;
-
-          input_axis_tlast_reg <= axis_sync_rx_tlast_reg;
-
-          axis_sync_rx_tready_reg <= input_axis_tready_reg;
-        end
-      end
-    end
-  end
-
-  assign s_axis_sync_rx_tready = axis_sync_rx_tready_reg;
+  header_extractor #(
+    .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH),
+    .AXIS_KEEP_WIDTH(AXIS_KEEP_WIDTH),
+    .AXIS_RX_USER_WIDTH(AXIS_RX_USER_WIDTH),
+    .HEADER_WIDTH(HEADER_LENGTH)
+  ) header_extractor_inst (
+    .clk(clk),
+    .rstn(rstn),
+    .input_axis_tdata(s_axis_sync_rx_tdata),
+    .input_axis_tkeep(s_axis_sync_rx_tkeep),
+    .input_axis_tvalid(s_axis_sync_rx_tvalid),
+    .input_axis_tready(s_axis_sync_rx_tready),
+    .input_axis_tlast(s_axis_sync_rx_tlast),
+    .input_axis_tuser(s_axis_sync_rx_tuser),
+    .os_axis_tdata(m_axis_sync_rx_tdata),
+    .os_axis_tkeep(m_axis_sync_rx_tkeep),
+    .os_axis_tvalid(m_axis_sync_rx_tvalid),
+    .os_axis_tready(m_axis_sync_rx_tready),
+    .os_axis_tlast(m_axis_sync_rx_tlast),
+    .os_axis_tuser(m_axis_sync_rx_tuser),
+    .raw_axis_tdata(raw_axis_tdata),
+    .raw_axis_tkeep(raw_axis_tkeep),
+    .raw_axis_tvalid(raw_axis_tvalid),
+    .raw_axis_tready(raw_axis_tready),
+    .raw_axis_tlast(raw_axis_tlast),
+    .raw_axis_tuser(raw_axis_tuser),
+    .datapath_switch(switch),
+    .datapath_switch_valid(switch_valid),
+    .header_validated(valid),
+    .header_validated_valid(valid_valid));
 
   ////----------------------------------------Buffer, CDC and Scaling FIFO----//
   //////////////////////////////////////////////////
@@ -499,21 +444,21 @@ module application_rx #(
   always @(*)
   begin
     if (!ber_test) begin
-      jesd_axis_tvalid = input_axis_tvalid_reg[1];
-      jesd_axis_tdata = buffer_axis_tdata_reg;
+      jesd_axis_tvalid = raw_axis_tvalid;
+      jesd_axis_tdata = raw_axis_tdata;
 
       ber_axis_tvalid = 1'b0;
       ber_axis_tdata = {AXIS_DATA_WIDTH{1'b0}};
 
-      input_axis_tready_reg = jesd_axis_tready;
+      raw_axis_tready = jesd_axis_tready;
     end else begin
       jesd_axis_tvalid = 1'b0;
       jesd_axis_tdata = {AXIS_DATA_WIDTH{1'b0}};
 
-      ber_axis_tvalid = input_axis_tvalid_reg[1];
-      ber_axis_tdata = buffer_axis_tdata_reg;
+      ber_axis_tvalid = raw_axis_tvalid;
+      ber_axis_tdata = raw_axis_tdata;
 
-      input_axis_tready_reg = ber_axis_tready;
+      raw_axis_tready = ber_axis_tready;
     end
   end
 

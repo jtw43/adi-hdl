@@ -15,8 +15,9 @@ adi_ip_files application_core [list \
   "application_core.v" \
   "application_tx.v" \
   "application_rx.v" \
-  "rx_arbiter.v" \
+  "header_checker.v" \
   "header_inserter.v" \
+  "header_extractor.v" \
   "packetizer.v" \
   "udp_header.v" \
   "ip_header.v" \
