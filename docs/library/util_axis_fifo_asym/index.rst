@@ -21,6 +21,10 @@ Features
 * Supports asynchronous (double clocked) mode
 * Supports TLAST to indicate packet boundary
 * Supports TKEEP to indicate valid data bytes
+* Supports TSTRB to indicate position bytes in the transfer
+* Supports TUSER to transfer user-defined signals
+* Supports TID to provide a stream identifier
+* Supports TDEST to provide routing information
 * Supports FULL/EMPTY and ALMOST_FULL/ALMOST_EMPTY status signals
 
 Files
@@ -59,6 +63,20 @@ Configuration Parameters
      - Enable ``TLAST`` logical port on the AXI streaming interface.
    * - TKEEP_EN
      - Enable ``TKEEP`` logical port on the AXI streaming interface.
+   * - TSTRB_EN
+     - Enable ``TSTRB`` logical port on the AXI streaming interface.
+   * - TUSER_EN
+     - Enable ``TUSER`` logical port on the AXI streaming interface.
+   * - USER_WIDTH
+     - ``TUSER`` signal width if ``TUSER`` is enabled.
+   * - TID_EN
+     - Enable ``TID`` logical port on the AXI streaming interface.
+   * - ID_WIDTH
+     - ``TID`` signal width if ``TID`` is enabled.
+   * - TDEST_EN
+     - Enable ``TDEST`` logical port on the AXI streaming interface.
+   * - DEST_WIDTH
+     - ``TDEST`` signal width if ``TDEST`` is enabled.
    * - REDUCED_FIFO
      - Reduce the FIFO size when master and slave data widths are not equal
 
@@ -110,22 +128,27 @@ blocks are calculated as follows:
    // bus width ratio
    localparam RATIO = (RATIO_TYPE) ? S_DATA_WIDTH/M_DATA_WIDTH : M_DATA_WIDTH/S_DATA_WIDTH;
    // atomic parameters
-   localparam A_WIDTH = (RATIO_TYPE) ? M_DATA_WIDTH : S_DATA_WIDTH;
-   localparam A_ADDRESS = (REDUCED_FIFO) ? (ADDRESS_WIDTH-$clog2(RATIO)) : ADDRESS_WIDTH;
+   localparam A_DATA_WIDTH = (RATIO_TYPE) ? M_DATA_WIDTH : S_DATA_WIDTH;
+   localparam A_ADDRESS_WIDTH = (REDUCED_FIFO) ? (ADDRESS_WIDTH-$clog2(RATIO)) : ADDRESS_WIDTH;
    localparam A_ALMOST_FULL_THRESHOLD = (REDUCED_FIFO) ? ((ALMOST_FULL_THRESHOLD+RATIO-1)/RATIO) : ALMOST_FULL_THRESHOLD;
    localparam A_ALMOST_EMPTY_THRESHOLD = (REDUCED_FIFO) ? ((ALMOST_EMPTY_THRESHOLD+RATIO-1)/RATIO) : ALMOST_EMPTY_THRESHOLD;
+   localparam A_USER_WIDTH = USER_WIDTH / RATIO;
+
+FIFO Depth Calculation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The FIFO Depth is calculated based on M_DATA_WIDTH, S_DATA_WIDTH,
+ADDRESS_WIDTH and REDUCED_FIFO parameters:
+
+- When M_DATA_WIDTH and S_DATA_WIDTH are equal or REDUCED_FIFO is disabled, the
+  ADDRESS_WIDTH specified is not changed.
+- When M_DATA_WIDTH and S_DATA_WIDTH are not equal and the REDUCED_FIFO is
+  enabled, the ADDRESS_WIDTH is reduced by log2 ratio of the master and slave
+  data widths. This change also affects the almost full and empty threshold
+  values.
 
 Status Signal Delays
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. important::
-
-   In case of asynchronous mode, because of the delays introduced by the clock
-   domain crossing logic, the ROOM and LEVEL indicators can not reflect
-   the actual state of the FIFO in real time. Source and destination logic
-   should take this into account when controlling the data stream into and
-   from the FIFO. Carefully adjusting the ALMOST_EMPTY/ALMOST_FULL indicators
-   can provide a save operating margin.
 
 The FIFO has three different status indicator ports on both side, which
 provides information about the state of the FIFO for both the source and
@@ -145,23 +168,25 @@ destination logic:
 -  M_AXIS_LEVEL - Indicate how many word can be read from the FIFO at the
    current moment, until the FIFO become EMPTY.
 
-FIFO Depth Calculation
+.. important::
+
+   In case of asynchronous mode, because of the delays introduced by the clock
+   domain crossing logic, the ROOM and LEVEL indicators can not reflect
+   the actual state of the FIFO in real time. Source and destination logic
+   should take this into account when controlling the data stream into and
+   from the FIFO. Carefully adjusting the ALMOST_EMPTY/ALMOST_FULL indicators
+   can provide a save operating margin.
+
+User Signal Transfer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The FIFO Depth is calculated based on M_DATA_WIDTH, S_DATA_WIDTH,
-ADDRESS_WIDTH and REDUCED_FIFO parameters:
+.. important::
 
-- When M_DATA_WIDTH and S_DATA_WIDTH are equal or REDUCED_FIFO is disabled, the
-  ADDRESS_WIDTH specified is not changed.
-- When M_DATA_WIDTH and S_DATA_WIDTH are not equal and the REDUCED_FIFO is
-  enabled, the ADDRESS_WIDTH is reduced by log2 ratio of the master and slave
-  data widths.
-
-Software Support
---------------------------------------------------------------------------------
-
-* Linux project at :git-linux:`drivers/staging/axis-fifo`
-* Linux driver at :git-linux:`drivers/staging/axis-fifo/axis-fifo.c`
+   In case of user signal transfer, the user signal width must be set as an
+   integer multiple of the width of the interface in bytes. In other words, all
+   bytes in the transfer have a fixed amount of user signals assigned to them.
+   This core does not support user signals that are transfer-based, meaning that
+   all user signals apply to all bytes.
 
 References
 --------------------------------------------------------------------------------
