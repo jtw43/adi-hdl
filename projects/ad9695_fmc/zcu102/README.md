@@ -1,6 +1,10 @@
-# AD9694-FMC HDL Project
+<!-- no_no_os -->
+
+# AD9694-FMC/ZCU102 HDL Project
 
 :warning: For the 625MSPS variant, additional changes need to be done, which currently are not supported by our reference design!
+
+- VADJ with which it was tested in hardware: 1.8V
 
 ## Building the project
 
