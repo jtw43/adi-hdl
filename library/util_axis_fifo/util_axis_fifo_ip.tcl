@@ -15,9 +15,14 @@ adi_ip_files util_axis_fifo [list \
 	"$ad_hdl_dir/library/common/ad_mem.v" \
 	"$ad_hdl_dir/library/util_cdc/sync_bits.v" \
 	"$ad_hdl_dir/library/util_cdc/sync_gray.v" \
+	"bd/bd.tcl" \
 ]
 
+set_property used_in_simulation false [get_files ./bd/bd.tcl]
+set_property used_in_synthesis false [get_files ./bd/bd.tcl]
+
 adi_ip_properties_lite util_axis_fifo
+adi_ip_bd util_axis_fifo "bd/bd.tcl"
 
 adi_ip_add_core_dependencies [list \
 	analog.com:$VIVADO_IP_LIBRARY:util_cdc:1.0 \
@@ -53,11 +58,11 @@ adi_set_ports_dependency "s_axis_tkeep" \
 adi_set_ports_dependency "s_axis_tstrb" \
 	"(spirit:decode(id('MODELPARAM_VALUE.TSTRB_EN')) = 1)"
 adi_set_ports_dependency "s_axis_tuser" \
-	"(spirit:decode(id('MODELPARAM_VALUE.TUSER_EN')) = 1)"
+	"(spirit:decode(id('MODELPARAM_VALUE.TUSER_WIDTH')) > 0)"
 adi_set_ports_dependency "s_axis_tid" \
-	"(spirit:decode(id('MODELPARAM_VALUE.TID_EN')) = 1)"
+	"(spirit:decode(id('MODELPARAM_VALUE.TID_WIDTH')) > 0)"
 adi_set_ports_dependency "s_axis_tdest" \
-	"(spirit:decode(id('MODELPARAM_VALUE.TDEST_EN')) = 1)"
+	"(spirit:decode(id('MODELPARAM_VALUE.TDEST_WIDTH')) > 0)"
 
 adi_add_bus "m_axis" "master" \
 	"xilinx.com:interface:axis_rtl:1.0" \
@@ -81,14 +86,17 @@ adi_set_ports_dependency "m_axis_tkeep" \
 adi_set_ports_dependency "m_axis_tstrb" \
 	"(spirit:decode(id('MODELPARAM_VALUE.TSTRB_EN')) = 1)"
 adi_set_ports_dependency "m_axis_tuser" \
-	"(spirit:decode(id('MODELPARAM_VALUE.TUSER_EN')) = 1)"
+	"(spirit:decode(id('MODELPARAM_VALUE.TUSER_WIDTH')) > 0)"
 adi_set_ports_dependency "m_axis_tid" \
-	"(spirit:decode(id('MODELPARAM_VALUE.TID_EN')) = 1)"
+	"(spirit:decode(id('MODELPARAM_VALUE.TID_WIDTH')) > 0)"
 adi_set_ports_dependency "m_axis_tdest" \
-	"(spirit:decode(id('MODELPARAM_VALUE.TDEST_EN')) = 1)"
+	"(spirit:decode(id('MODELPARAM_VALUE.TDEST_WIDTH')) > 0)"
 
 adi_add_bus_clock "m_axis_aclk" "m_axis" "m_axis_aresetn"
 adi_add_bus_clock "s_axis_aclk" "s_axis" "s_axis_aresetn"
+
+ipx::add_bus_parameter FREQ_HZ [ipx::get_bus_interfaces m_axis_signal_clock -of_objects $cc]
+ipx::add_bus_parameter FREQ_HZ [ipx::get_bus_interfaces s_axis_signal_clock -of_objects $cc]
 
 ## Parameter validation
 
@@ -115,18 +123,18 @@ set_property -dict [list \
 
 set_property -dict [list \
 	"value_validation_type" "range_long" \
-	"value_validation_range_minimum" "1" \
-] [ipx::get_user_parameters USER_WIDTH -of_objects $cc]
+	"value_validation_range_minimum" "0" \
+] [ipx::get_user_parameters TUSER_WIDTH -of_objects $cc]
 
 set_property -dict [list \
 	"value_validation_type" "range_long" \
-	"value_validation_range_minimum" "1" \
-] [ipx::get_user_parameters ID_WIDTH -of_objects $cc]
+	"value_validation_range_minimum" "0" \
+] [ipx::get_user_parameters TID_WIDTH -of_objects $cc]
 
 set_property -dict [list \
 	"value_validation_type" "range_long" \
-	"value_validation_range_minimum" "1" \
-] [ipx::get_user_parameters DEST_WIDTH -of_objects $cc]
+	"value_validation_range_minimum" "0" \
+] [ipx::get_user_parameters TDEST_WIDTH -of_objects $cc]
 
 set_property -dict [list \
 	"value_validation_type" "pairs" \
@@ -141,9 +149,6 @@ foreach {k v} { \
 	"TLAST_EN"            "false" \
 	"TKEEP_EN"            "false" \
 	"TSTRB_EN"            "false" \
-	"TUSER_EN"            "false" \
-	"TID_EN"            	"false" \
-	"TDEST_EN"            "false" \
 	"REMOVE_NULL_BEAT_EN" "false" \
 } { \
   set_property -dict [list \
@@ -224,47 +229,26 @@ set_property -dict [list \
 ] [ipgui::get_guiparamspec -name "TSTRB_EN" -component $cc]
 set_property driver_value 0 [ipx::get_ports s_axis_tstrb -of_objects $cc]
 
-ipgui::add_param -name "TUSER_EN" -component $cc -parent $interface_group
-set_property -dict [list \
-	"display_name" "TUSER Enable" \
-	"tooltip" "\[TUSER_EN\] Enable the TUSER for the AXI stream interface, for user-defined sideband information." \
-] [ipgui::get_guiparamspec -name "TUSER_EN" -component $cc]
-set_property driver_value 0 [ipx::get_ports s_axis_tuser -of_objects $cc]
-
-ipgui::add_param -name "USER_WIDTH" -component $cc -parent $interface_group
+ipgui::add_param -name "TUSER_WIDTH" -component $cc -parent $interface_group
 set_property -dict [list \
 	"display_name" "User signal width" \
-	"tooltip" "\[USER_WIDTH\] TUSER signal bus width." \
-] [ipgui::get_guiparamspec -name "USER_WIDTH" -component $cc]
-set_property enablement_tcl_expr {$TUSER_EN == "true"} [ipx::get_user_parameters USER_WIDTH -of_objects $cc]
+	"tooltip" "\[TUSER_WIDTH\] TUSER signal bus width." \
+] [ipgui::get_guiparamspec -name "TUSER_WIDTH" -component $cc]
+set_property driver_value 0 [ipx::get_ports s_axis_tuser -of_objects $cc]
 
-ipgui::add_param -name "TID_EN" -component $cc -parent $interface_group
-set_property -dict [list \
-	"display_name" "TID Enable" \
-	"tooltip" "\[TID_EN\] Enable the TID for the AXI stream interface, for data stream identification." \
-] [ipgui::get_guiparamspec -name "TID_EN" -component $cc]
-set_property driver_value 0 [ipx::get_ports s_axis_tid -of_objects $cc]
-
-ipgui::add_param -name "ID_WIDTH" -component $cc -parent $interface_group
+ipgui::add_param -name "TID_WIDTH" -component $cc -parent $interface_group
 set_property -dict [list \
 	"display_name" "ID signal width" \
-	"tooltip" "\[ID_WIDTH\] TID signal bus width." \
-] [ipgui::get_guiparamspec -name "ID_WIDTH" -component $cc]
-set_property enablement_tcl_expr {$TID_EN == "true"} [ipx::get_user_parameters ID_WIDTH -of_objects $cc]
+	"tooltip" "\[TID_WIDTH\] TID signal bus width." \
+] [ipgui::get_guiparamspec -name "TID_WIDTH" -component $cc]
+set_property driver_value 0 [ipx::get_ports s_axis_tid -of_objects $cc]
 
-ipgui::add_param -name "TDEST_EN" -component $cc -parent $interface_group
-set_property -dict [list \
-	"display_name" "TDEST Enable" \
-	"tooltip" "\[TDEST_EN\] Enable the TDEST for the AXI stream interface, for data stream routing information." \
-] [ipgui::get_guiparamspec -name "TDEST_EN" -component $cc]
-set_property driver_value 0 [ipx::get_ports s_axis_tdest -of_objects $cc]
-
-ipgui::add_param -name "DEST_WIDTH" -component $cc -parent $interface_group
+ipgui::add_param -name "TDEST_WIDTH" -component $cc -parent $interface_group
 set_property -dict [list \
 	"display_name" "Destination signal width" \
-	"tooltip" "\[DEST_WIDTH\] TDEST signal bus width." \
-] [ipgui::get_guiparamspec -name "DEST_WIDTH" -component $cc]
-set_property enablement_tcl_expr {$TDEST_EN == "true"} [ipx::get_user_parameters DEST_WIDTH -of_objects $cc]
+	"tooltip" "\[TDEST_WIDTH\] TDEST signal bus width." \
+] [ipgui::get_guiparamspec -name "TDEST_WIDTH" -component $cc]
+set_property driver_value 0 [ipx::get_ports s_axis_tdest -of_objects $cc]
 
 set other_group [ipgui::add_group -name "Other Features" -component $cc \
 	-parent $page0 -display_name "Other Features" ]

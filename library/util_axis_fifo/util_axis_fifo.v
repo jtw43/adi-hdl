@@ -44,12 +44,9 @@ module util_axis_fifo #(
   parameter TLAST_EN = 0,
   parameter TKEEP_EN = 0,
   parameter TSTRB_EN = 0,
-  parameter TUSER_EN = 0,
-  parameter TID_EN = 0,
-  parameter TDEST_EN = 0,
-  parameter USER_WIDTH = 8,
-  parameter ID_WIDTH = 8,
-  parameter DEST_WIDTH = 8,
+  parameter TUSER_WIDTH = 0,
+  parameter TID_WIDTH = 0,
+  parameter TDEST_WIDTH = 0,
   parameter REMOVE_NULL_BEAT_EN = 0
 ) (
   input                      m_axis_aclk,
@@ -60,9 +57,9 @@ module util_axis_fifo #(
   output [DATA_WIDTH/8-1:0]  m_axis_tkeep,
   output [DATA_WIDTH/8-1:0]  m_axis_tstrb,
   output                     m_axis_tlast,
-  output [USER_WIDTH-1:0]    m_axis_tuser,
-  output [ID_WIDTH-1:0]      m_axis_tid,
-  output [DEST_WIDTH-1:0]    m_axis_tdest,
+  output [TUSER_WIDTH-1:0]   m_axis_tuser,
+  output [TID_WIDTH-1:0]     m_axis_tid,
+  output [TDEST_WIDTH-1:0]   m_axis_tdest,
   output [ADDRESS_WIDTH-1:0] m_axis_level,
   output                     m_axis_empty,
   output                     m_axis_almost_empty,
@@ -75,21 +72,21 @@ module util_axis_fifo #(
   input  [DATA_WIDTH/8-1:0]  s_axis_tkeep,
   input  [DATA_WIDTH/8-1:0]  s_axis_tstrb,
   input                      s_axis_tlast,
-  input  [USER_WIDTH-1:0]    s_axis_tuser,
-  input  [ID_WIDTH-1:0]      s_axis_tid,
-  input  [DEST_WIDTH-1:0]    s_axis_tdest,
+  input  [TUSER_WIDTH-1:0]   s_axis_tuser,
+  input  [TID_WIDTH-1:0]     s_axis_tid,
+  input  [TDEST_WIDTH-1:0]   s_axis_tdest,
   output [ADDRESS_WIDTH-1:0] s_axis_room,
   output                     s_axis_full,
   output                     s_axis_almost_full
 );
 
   localparam MEM_WORD = DATA_WIDTH +
-                        ((TKEEP_EN) ? (DATA_WIDTH/8) : 0) +
-                        ((TSTRB_EN) ? (DATA_WIDTH/8) : 0) +
-                        ((TLAST_EN) ? 1              : 0) +
-                        ((TUSER_EN) ? USER_WIDTH     : 0) +
-                        ((TID_EN)   ? ID_WIDTH       : 0) +
-                        ((TDEST_EN) ? DEST_WIDTH     : 0);
+                        ((TKEEP_EN)        ? (DATA_WIDTH/8) : 0) +
+                        ((TSTRB_EN)        ? (DATA_WIDTH/8) : 0) +
+                        ((TLAST_EN)        ? 1              : 0) +
+                        ((TUSER_WIDTH > 0) ? TUSER_WIDTH    : 0) +
+                        ((TID_WIDTH > 0)   ? TID_WIDTH      : 0) +
+                        ((TDEST_WIDTH > 0) ? TDEST_WIDTH    : 0);
 
   wire [MEM_WORD-1:0] s_axis_data_int_s;
   wire [MEM_WORD-1:0] m_axis_data_int_s;
@@ -214,8 +211,8 @@ module util_axis_fifo #(
       end
 
       // TUSER support
-      if (TUSER_EN) begin
-        reg [USER_WIDTH-1:0] axis_tuser_d;
+      if (TUSER_WIDTH > 0) begin
+        reg [TUSER_WIDTH-1:0] axis_tuser_d;
 
         always @(posedge s_axis_aclk) begin
           if (s_axis_ready == 1'b1 && s_axis_valid == 1'b1) begin
@@ -224,12 +221,12 @@ module util_axis_fifo #(
         end
         assign m_axis_tuser = axis_tuser_d;
       end else begin
-        assign m_axis_tuser = {USER_WIDTH{1'b0}};
+        assign m_axis_tuser = 2'b00;
       end
 
       // TID support
-      if (TID_EN) begin
-        reg [ID_WIDTH-1:0] axis_tid_d;
+      if (TID_WIDTH > 0) begin
+        reg [TID_WIDTH-1:0] axis_tid_d;
 
         always @(posedge s_axis_aclk) begin
           if (s_axis_ready == 1'b1 && s_axis_valid == 1'b1) begin
@@ -238,12 +235,12 @@ module util_axis_fifo #(
         end
         assign m_axis_tid = axis_tid_d;
       end else begin
-        assign m_axis_tid = {ID_WIDTH{1'b0}};
+        assign m_axis_tuser = 2'b00;
       end
 
       // TDEST support
-      if (TDEST_EN) begin
-        reg [DEST_WIDTH-1:0] axis_tdest_d;
+      if (TDEST_WIDTH > 0) begin
+        reg [TDEST_WIDTH-1:0] axis_tdest_d;
 
         always @(posedge s_axis_aclk) begin
           if (s_axis_ready == 1'b1 && s_axis_valid == 1'b1) begin
@@ -252,7 +249,7 @@ module util_axis_fifo #(
         end
         assign m_axis_tdest = axis_tdest_d;
       end else begin
-        assign m_axis_tdest = {DEST_WIDTH{1'b0}};
+        assign m_axis_tdest = 2'b00;
       end
 
     end /* zerodeep */
@@ -358,12 +355,12 @@ module util_axis_fifo #(
       end
 
       // TUSER support
-      if (TUSER_EN) begin
-        reg [USER_WIDTH-1:0] axis_tuser_d;
+      if (TUSER_WIDTH > 0) begin
+        reg [TUSER_WIDTH-1:0] axis_tuser_d;
 
         always @(posedge s_axis_aclk) begin
           if (!s_axis_aresetn) begin
-            axis_tuser_d <= {USER_WIDTH{1'b0}};
+            axis_tuser_d <= {TUSER_WIDTH{1'b0}};
           end else begin
             if (s_axis_ready) begin
               axis_tuser_d <= s_axis_tuser;
@@ -372,16 +369,16 @@ module util_axis_fifo #(
         end
         assign m_axis_tuser = axis_tuser_d;
       end else begin
-        assign m_axis_tuser = {USER_WIDTH{1'b0}};
+        assign m_axis_tuser = 2'b00;
       end
 
       // TID support
-      if (TID_EN) begin
-        reg [ID_WIDTH-1:0] axis_tid_d;
+      if (TID_WIDTH > 0) begin
+        reg [TID_WIDTH-1:0] axis_tid_d;
 
         always @(posedge s_axis_aclk) begin
           if (!s_axis_aresetn) begin
-            axis_tid_d <= {ID_WIDTH{1'b0}};
+            axis_tid_d <= {TID_WIDTH{1'b0}};
           end else begin
             if (s_axis_ready) begin
               axis_tid_d <= s_axis_tid;
@@ -390,16 +387,16 @@ module util_axis_fifo #(
         end
         assign m_axis_tid = axis_tid_d;
       end else begin
-        assign m_axis_tid = {ID_WIDTH{1'b0}};
+        assign m_axis_tid = 2'b00;
       end
 
       // TDEST support
-      if (TDEST_EN) begin
-        reg [DEST_WIDTH-1:0] axis_tdest_d;
+      if (TDEST_WIDTH > 0) begin
+        reg [TDEST_WIDTH-1:0] axis_tdest_d;
 
         always @(posedge s_axis_aclk) begin
           if (!s_axis_aresetn) begin
-            axis_tdest_d <= {DEST_WIDTH{1'b0}};
+            axis_tdest_d <= {TDEST_WIDTH{1'b0}};
           end else begin
             if (s_axis_ready) begin
               axis_tdest_d <= s_axis_tdest;
@@ -408,7 +405,7 @@ module util_axis_fifo #(
         end
         assign m_axis_tdest = axis_tdest_d;
       end else begin
-        assign m_axis_tdest = {DEST_WIDTH{1'b0}};
+        assign m_axis_tdest = 2'b00;
       end
 
     end /* !ASYNC_CLK */
@@ -482,13 +479,13 @@ module util_axis_fifo #(
                               ((TLAST_EN) ? 1 : 0);
 
     localparam MEM_WORD_USER = MEM_WORD_LAST +
-                              ((TUSER_EN) ? USER_WIDTH : 0);
+                              ((TUSER_WIDTH > 0) ? TUSER_WIDTH : 0);
 
     localparam MEM_WORD_ID = MEM_WORD_USER +
-                            ((TID_EN) ? ID_WIDTH : 0);
+                            ((TID_WIDTH > 0) ? TID_WIDTH : 0);
 
     localparam MEM_WORD_DEST = MEM_WORD_ID +
-                              ((TDEST_EN) ? DEST_WIDTH : 0);
+                              ((TDEST_WIDTH > 0) ? TDEST_WIDTH : 0);
 
     assign s_axis_data_int_s[DATA_WIDTH-1-:DATA_WIDTH] = s_axis_data;
     assign m_axis_data = m_axis_data_int_s[DATA_WIDTH-1-:DATA_WIDTH];
@@ -518,25 +515,25 @@ module util_axis_fifo #(
       assign m_axis_tlast = 1'b1;
     end
 
-    if (TUSER_EN) begin
-      assign s_axis_data_int_s[MEM_WORD_USER-1-:USER_WIDTH] = s_axis_tuser;
-      assign m_axis_tuser = m_axis_data_int_s[MEM_WORD_USER-1-:USER_WIDTH];
+    if (TUSER_WIDTH > 0) begin
+      assign s_axis_data_int_s[MEM_WORD_USER-1-:TUSER_WIDTH] = s_axis_tuser;
+      assign m_axis_tuser = m_axis_data_int_s[MEM_WORD_USER-1-:TUSER_WIDTH];
     end else begin
-      assign m_axis_tuser = {USER_WIDTH{1'b0}};
+      assign m_axis_tuser = 2'b00;
     end
 
-    if (TID_EN) begin
-      assign s_axis_data_int_s[MEM_WORD_ID-1-:ID_WIDTH] = s_axis_tid;
-      assign m_axis_tid = m_axis_data_int_s[MEM_WORD_ID-1-:ID_WIDTH];
+    if (TID_WIDTH > 0) begin
+      assign s_axis_data_int_s[MEM_WORD_ID-1-:TID_WIDTH] = s_axis_tid;
+      assign m_axis_tid = m_axis_data_int_s[MEM_WORD_ID-1-:TID_WIDTH];
     end else begin
-      assign m_axis_tid = {ID_WIDTH{1'b0}};
+      assign m_axis_tid = 2'b00;
     end
 
-    if (TDEST_EN) begin
-      assign s_axis_data_int_s[MEM_WORD_DEST-1-:DEST_WIDTH] = s_axis_tdest;
-      assign m_axis_tdest = m_axis_data_int_s[MEM_WORD_DEST-1-:DEST_WIDTH];
+    if (TDEST_WIDTH > 0) begin
+      assign s_axis_data_int_s[MEM_WORD_DEST-1-:TDEST_WIDTH] = s_axis_tdest;
+      assign m_axis_tdest = m_axis_data_int_s[MEM_WORD_DEST-1-:TDEST_WIDTH];
     end else begin
-      assign m_axis_tdest = {DEST_WIDTH{1'b0}};
+      assign m_axis_tdest = 2'b00;
     end
 
     if (ASYNC_CLK == 1) begin : async_clocks /* Asynchronous WRITE/READ clocks */
