@@ -45,12 +45,10 @@ module util_axis_fifo_asym #(
   parameter TLAST_EN = 0,
   parameter TKEEP_EN = 0,
   parameter TSTRB_EN = 0,
-  parameter TUSER_EN = 0,
-  parameter TID_EN = 0,
-  parameter TDEST_EN = 0,
-  parameter USER_WIDTH = 8,
-  parameter ID_WIDTH = 8,
-  parameter DEST_WIDTH = 8,
+  parameter TUSER_BITS_PER_BYTE = 0,
+  parameter TUSER_WIDTH = 0,
+  parameter TID_WIDTH = 0,
+  parameter TDEST_WIDTH = 0,
   parameter REDUCED_FIFO = 1
 ) (
   input                       m_axis_aclk,
@@ -61,9 +59,9 @@ module util_axis_fifo_asym #(
   output [M_DATA_WIDTH/8-1:0] m_axis_tkeep,
   output [M_DATA_WIDTH/8-1:0] m_axis_tstrb,
   output                      m_axis_tlast,
-  output [USER_WIDTH-1:0]     m_axis_tuser,
-  output [ID_WIDTH-1:0]       m_axis_tid,
-  output [DEST_WIDTH-1:0]     m_axis_tdest,
+  output [TUSER_WIDTH-1:0]    m_axis_tuser,
+  output [TID_WIDTH-1:0]      m_axis_tid,
+  output [TDEST_WIDTH-1:0]    m_axis_tdest,
   output                      m_axis_empty,
   output                      m_axis_almost_empty,
   output [ADDRESS_WIDTH+9:0]  m_axis_level,
@@ -76,9 +74,9 @@ module util_axis_fifo_asym #(
   input  [S_DATA_WIDTH/8-1:0] s_axis_tkeep,
   input  [S_DATA_WIDTH/8-1:0] s_axis_tstrb,
   input                       s_axis_tlast,
-  input  [USER_WIDTH-1:0]     s_axis_tuser,
-  input  [ID_WIDTH-1:0]       s_axis_tid,
-  input  [DEST_WIDTH-1:0]     s_axis_tdest,
+  input  [TUSER_WIDTH-1:0]    s_axis_tuser,
+  input  [TID_WIDTH-1:0]      s_axis_tid,
+  input  [TDEST_WIDTH-1:0]    s_axis_tdest,
   output                      s_axis_full,
   output                      s_axis_almost_full,
   output [ADDRESS_WIDTH+9:0]  s_axis_room
@@ -95,7 +93,9 @@ module util_axis_fifo_asym #(
   localparam A_ADDRESS_WIDTH = (REDUCED_FIFO) ? (ADDRESS_WIDTH-$clog2(RATIO)) : ADDRESS_WIDTH;
   localparam A_ALMOST_FULL_THRESHOLD = (REDUCED_FIFO) ? ((ALMOST_FULL_THRESHOLD+RATIO-1)/RATIO) : ALMOST_FULL_THRESHOLD;
   localparam A_ALMOST_EMPTY_THRESHOLD = (REDUCED_FIFO) ? ((ALMOST_EMPTY_THRESHOLD+RATIO-1)/RATIO) : ALMOST_EMPTY_THRESHOLD;
-  localparam A_USER_WIDTH = USER_WIDTH / RATIO;
+  localparam A_TUSER_WIDTH = (TUSER_WIDTH > 0) ? ((TUSER_BITS_PER_BYTE) ? TUSER_WIDTH / RATIO : TUSER_WIDTH) : 1; // set to 1 when tuser width is 0 to avoid synthesis errors
+  localparam A_TID_WIDTH = (TID_WIDTH > 0) ? TID_WIDTH : 1; // set to 1 when tid width is 0 to avoid synthesis errors
+  localparam A_TDEST_WIDTH = (TDEST_WIDTH > 0) ? TDEST_WIDTH : 1; // set to 1 when tdest width is 0 to avoid synthesis errors
 
   // slave and master sequencers
   reg [$clog2(RATIO)-1:0] s_axis_counter;
@@ -107,9 +107,9 @@ module util_axis_fifo_asym #(
   wire [RATIO*A_DATA_WIDTH/8-1:0]  m_axis_tkeep_int_s;
   wire [RATIO*A_DATA_WIDTH/8-1:0]  m_axis_tstrb_int_s;
   wire [RATIO-1:0]                 m_axis_tlast_int_s;
-  wire [RATIO*A_USER_WIDTH-1:0]    m_axis_tuser_int_s;
-  wire [RATIO*ID_WIDTH-1:0]        m_axis_tid_int_s;
-  wire [RATIO*DEST_WIDTH-1:0]      m_axis_tdest_int_s;
+  wire [RATIO*A_TUSER_WIDTH-1:0]   m_axis_tuser_int_s;
+  wire [RATIO*A_TID_WIDTH-1:0]     m_axis_tid_int_s;
+  wire [RATIO*A_TDEST_WIDTH-1:0]   m_axis_tdest_int_s;
   wire [RATIO-1:0]                 m_axis_empty_int_s;
   wire [RATIO-1:0]                 m_axis_almost_empty_int_s;
   wire [RATIO*A_ADDRESS_WIDTH-1:0] m_axis_level_int_s;
@@ -120,9 +120,9 @@ module util_axis_fifo_asym #(
   wire [RATIO*A_DATA_WIDTH/8-1:0]  s_axis_tkeep_int_s;
   wire [RATIO*A_DATA_WIDTH/8-1:0]  s_axis_tstrb_int_s;
   wire [RATIO-1:0]                 s_axis_tlast_int_s;
-  wire [RATIO*A_USER_WIDTH-1:0]    s_axis_tuser_int_s;
-  wire [RATIO*ID_WIDTH-1:0]        s_axis_tid_int_s;
-  wire [RATIO*DEST_WIDTH-1:0]      s_axis_tdest_int_s;
+  wire [RATIO*A_TUSER_WIDTH-1:0]   s_axis_tuser_int_s;
+  wire [RATIO*A_TID_WIDTH-1:0]     s_axis_tid_int_s;
+  wire [RATIO*A_TDEST_WIDTH-1:0]   s_axis_tdest_int_s;
   wire [RATIO-1:0]                 s_axis_full_int_s;
   wire [RATIO-1:0]                 s_axis_almost_full_int_s;
   wire [RATIO*A_ADDRESS_WIDTH-1:0] s_axis_room_int_s;
@@ -143,12 +143,9 @@ module util_axis_fifo_asym #(
         .TLAST_EN (TLAST_EN),
         .TKEEP_EN (TKEEP_EN),
         .TSTRB_EN (TSTRB_EN),
-        .TUSER_EN (TUSER_EN),
-        .TID_EN (TID_EN),
-        .TDEST_EN (TDEST_EN),
-        .USER_WIDTH(A_USER_WIDTH),
-        .ID_WIDTH(ID_WIDTH),
-        .DEST_WIDTH(DEST_WIDTH)
+        .TUSER_WIDTH((TUSER_WIDTH > 0) ? A_TUSER_WIDTH : 0),
+        .TID_WIDTH(TID_WIDTH),
+        .TDEST_WIDTH(TDEST_WIDTH)
       ) i_fifo (
         .m_axis_aclk    (m_axis_aclk),
         .m_axis_aresetn (m_axis_aresetn),
@@ -158,9 +155,9 @@ module util_axis_fifo_asym #(
         .m_axis_tkeep   (m_axis_tkeep_int_s[A_DATA_WIDTH/8*i+:A_DATA_WIDTH/8]),
         .m_axis_tstrb   (m_axis_tstrb_int_s[A_DATA_WIDTH/8*i+:A_DATA_WIDTH/8]),
         .m_axis_tlast   (m_axis_tlast_int_s[i]),
-        .m_axis_tuser   (m_axis_tuser_int_s[A_USER_WIDTH*i+:A_USER_WIDTH]),
-        .m_axis_tid     (m_axis_tid_int_s[ID_WIDTH*i+:ID_WIDTH]),
-        .m_axis_tdest   (m_axis_tdest_int_s[DEST_WIDTH*i+:DEST_WIDTH]),
+        .m_axis_tuser   (m_axis_tuser_int_s[A_TUSER_WIDTH*i+:A_TUSER_WIDTH]),
+        .m_axis_tid     (m_axis_tid_int_s[A_TID_WIDTH*i+:A_TID_WIDTH]),
+        .m_axis_tdest   (m_axis_tdest_int_s[A_TDEST_WIDTH*i+:A_TDEST_WIDTH]),
         .m_axis_level   (m_axis_level_int_s[A_ADDRESS_WIDTH*i+:A_ADDRESS_WIDTH]),
         .m_axis_empty   (m_axis_empty_int_s[i]),
         .m_axis_almost_empty (m_axis_almost_empty_int_s[i]),
@@ -172,9 +169,9 @@ module util_axis_fifo_asym #(
         .s_axis_tkeep   (s_axis_tkeep_int_s[A_DATA_WIDTH/8*i+:A_DATA_WIDTH/8]),
         .s_axis_tstrb   (s_axis_tstrb_int_s[A_DATA_WIDTH/8*i+:A_DATA_WIDTH/8]),
         .s_axis_tlast   (s_axis_tlast_int_s[i]),
-        .s_axis_tuser   (s_axis_tuser_int_s[A_USER_WIDTH*i+:A_USER_WIDTH]),
-        .s_axis_tid     (s_axis_tid_int_s[ID_WIDTH*i+:ID_WIDTH]),
-        .s_axis_tdest   (s_axis_tdest_int_s[DEST_WIDTH*i+:DEST_WIDTH]),
+        .s_axis_tuser   (s_axis_tuser_int_s[A_TUSER_WIDTH*i+:A_TUSER_WIDTH]),
+        .s_axis_tid     (s_axis_tid_int_s[A_TID_WIDTH*i+:A_TID_WIDTH]),
+        .s_axis_tdest   (s_axis_tdest_int_s[A_TDEST_WIDTH*i+:A_TDEST_WIDTH]),
         .s_axis_room    (s_axis_room_int_s[A_ADDRESS_WIDTH*i+:A_ADDRESS_WIDTH]),
         .s_axis_full    (s_axis_full_int_s[i]),
         .s_axis_almost_full (s_axis_almost_full_int_s[i]));
@@ -217,23 +214,29 @@ module util_axis_fifo_asym #(
         end
       end
 
-      if (TUSER_EN) begin
-        assign s_axis_tuser_int_s = s_axis_tuser;
+      if (TUSER_WIDTH > 0) begin
+        if (TUSER_BITS_PER_BYTE) begin
+          assign s_axis_tuser_int_s = s_axis_tuser;
+        end else begin
+          for (i=0; i<RATIO; i=i+1) begin
+            assign s_axis_tuser_int_s[TUSER_WIDTH*i+:TUSER_WIDTH] = s_axis_tuser;
+          end
+        end
       end else begin
-        assign s_axis_tuser_int_s = {A_USER_WIDTH{1'b0}};
+        assign s_axis_tuser_int_s = 2'b00;
       end
 
       for (i=0; i<RATIO; i=i+1) begin
-        if (TID_EN) begin
-          assign s_axis_tid_int_s[ID_WIDTH*i+:ID_WIDTH] = s_axis_tid;
+        if (TID_WIDTH > 0) begin
+          assign s_axis_tid_int_s[TID_WIDTH*i+:TID_WIDTH] = s_axis_tid;
         end else begin
-          assign s_axis_tid_int_s[ID_WIDTH*i+:ID_WIDTH] = {ID_WIDTH{1'b0}};
+          assign s_axis_tid_int_s = 2'b00;
         end
 
-        if (TDEST_EN) begin
-          assign s_axis_tdest_int_s[DEST_WIDTH*i+:DEST_WIDTH] = s_axis_tdest;
+        if (TDEST_WIDTH > 0) begin
+          assign s_axis_tdest_int_s[TDEST_WIDTH*i+:TDEST_WIDTH] = s_axis_tdest;
         end else begin
-          assign s_axis_tdest_int_s[DEST_WIDTH*i+:DEST_WIDTH] = {DEST_WIDTH{1'b0}};
+          assign s_axis_tdest_int_s = 2'b00;
         end
       end
 
@@ -270,28 +273,32 @@ module util_axis_fifo_asym #(
           end
         end
 
-        if (TUSER_EN) begin
-          assign s_axis_tuser_int_s[A_USER_WIDTH*i+:A_USER_WIDTH] = (s_axis_counter == i) ? s_axis_tuser[A_USER_WIDTH-1:0] : {A_USER_WIDTH{1'b0}};
-        end else begin
-          assign s_axis_tuser_int_s[A_USER_WIDTH*i+:A_USER_WIDTH] = {A_USER_WIDTH{1'b0}};
-        end
-
         if (TLAST_EN) begin
           assign s_axis_tlast_int_s[i] = (s_axis_counter == i) ? s_axis_tlast : 1'b0;
         end else begin
           assign s_axis_tlast_int_s[i] = 1'b1;
         end
 
-        if (TID_EN) begin
-          assign s_axis_tid_int_s[ID_WIDTH*i+:ID_WIDTH] = (s_axis_counter == i) ? s_axis_tid : {ID_WIDTH{1'b0}};
+        if (TUSER_WIDTH > 0) begin
+          if (TUSER_BITS_PER_BYTE) begin
+            assign s_axis_tuser_int_s[A_TUSER_WIDTH*i+:A_TUSER_WIDTH] = (s_axis_counter == i) ? s_axis_tuser[A_TUSER_WIDTH-1:0] : {A_TUSER_WIDTH{1'b0}};
+          end else begin
+            assign s_axis_tuser_int_s[A_TUSER_WIDTH*i+:A_TUSER_WIDTH] = (s_axis_counter == i) ? s_axis_tuser : {A_TUSER_WIDTH{1'b0}};
+          end
         end else begin
-          assign s_axis_tid_int_s[ID_WIDTH*i+:ID_WIDTH] = {ID_WIDTH{1'b0}};
+          assign s_axis_tuser_int_s = 2'b00;
         end
 
-        if (TDEST_EN) begin
-          assign s_axis_tdest_int_s[DEST_WIDTH*i+:DEST_WIDTH] = (s_axis_counter == i) ? s_axis_tdest : {DEST_WIDTH{1'b0}};
+        if (TID_WIDTH > 0) begin
+          assign s_axis_tid_int_s[TID_WIDTH*i+:TID_WIDTH] = (s_axis_counter == i) ? s_axis_tid : {TID_WIDTH{1'b0}};
         end else begin
-          assign s_axis_tdest_int_s[DEST_WIDTH*i+:DEST_WIDTH] = {DEST_WIDTH{1'b0}};
+          assign s_axis_tid_int_s = 2'b00;
+        end
+
+        if (TDEST_WIDTH > 0) begin
+          assign s_axis_tdest_int_s[TDEST_WIDTH*i+:TDEST_WIDTH] = (s_axis_counter == i) ? s_axis_tdest : {TDEST_WIDTH{1'b0}};
+        end else begin
+          assign s_axis_tdest_int_s = 2'b00;
         end
       end
 
@@ -362,22 +369,26 @@ module util_axis_fifo_asym #(
         end
       end
 
-      if (TUSER_EN) begin
-        assign m_axis_tuser[A_USER_WIDTH-1:0] = m_axis_tuser_int_s >> (m_axis_counter*A_USER_WIDTH);
+      if (TUSER_WIDTH > 0) begin
+        if (TUSER_BITS_PER_BYTE) begin
+          assign m_axis_tuser[A_TUSER_WIDTH-1:0] = m_axis_tuser_int_s >> (m_axis_counter*A_TUSER_WIDTH);
+        end else begin
+          assign m_axis_tuser = m_axis_tuser_int_s >> (m_axis_counter*A_TUSER_WIDTH);
+        end
       end else begin
-        assign m_axis_tuser[A_USER_WIDTH-1:0] = {A_USER_WIDTH{1'b0}};
+        assign m_axis_tuser = 2'b00;
       end
 
-      if (TID_EN) begin
-        assign m_axis_tid = m_axis_tid_int_s >> (m_axis_counter*ID_WIDTH);
+      if (TID_WIDTH > 0) begin
+        assign m_axis_tid = m_axis_tid_int_s >> (m_axis_counter*TID_WIDTH);
       end else begin
-        assign m_axis_tid = {ID_WIDTH{1'b0}};
+        assign m_axis_tid = 2'b00;
       end
 
-      if (TDEST_EN) begin
-        assign m_axis_tdest = m_axis_tdest_int_s >> (m_axis_counter*DEST_WIDTH);
+      if (TDEST_WIDTH > 0) begin
+        assign m_axis_tdest = m_axis_tdest_int_s >> (m_axis_counter*TDEST_WIDTH);
       end else begin
-        assign m_axis_tdest = {DEST_WIDTH{1'b0}};
+        assign m_axis_tdest = 2'b00;
       end
 
       // VALID/EMPTY/ALMOST_EMPTY is driven by the current atomic instance
@@ -429,26 +440,30 @@ module util_axis_fifo_asym #(
           end
         end
 
-        if (TUSER_EN) begin
-          assign m_axis_tuser[i*A_USER_WIDTH+:A_USER_WIDTH] = ((m_axis_tlast_int_s[i:0] == 0) ||
-                                                              (m_axis_tlast_int_s[i])) ?
-                                                              m_axis_tuser_int_s[i*A_USER_WIDTH+:A_USER_WIDTH] :
-                                                              {(A_USER_WIDTH){1'b0}};
+        if (TUSER_WIDTH > 0) begin
+          if (TUSER_BITS_PER_BYTE) begin
+            assign m_axis_tuser[i*A_TUSER_WIDTH+:A_TUSER_WIDTH] = ((m_axis_tlast_int_s[i:0] == 0) ||
+                                                                (m_axis_tlast_int_s[i])) ?
+                                                                m_axis_tuser_int_s[i*A_TUSER_WIDTH+:A_TUSER_WIDTH] :
+                                                                {(A_TUSER_WIDTH){1'b0}};
+          end else begin
+            assign m_axis_tuser = m_axis_tuser_int_s[A_TUSER_WIDTH-1:0];
+          end
         end else begin
-          assign m_axis_tuser[i*A_USER_WIDTH+:A_USER_WIDTH] = {A_USER_WIDTH{1'b0}};
+          assign m_axis_tuser = 2'b00;
         end
       end
 
-      if (TID_EN) begin
-        assign m_axis_tid = m_axis_tid_int_s[ID_WIDTH-1:0];
+      if (TID_WIDTH > 0) begin
+        assign m_axis_tid = m_axis_tid_int_s[TID_WIDTH-1:0];
       end else begin
-        assign m_axis_tid = {ID_WIDTH{1'b0}};
+        assign m_axis_tid = 2'b00;
       end
 
-      if (TDEST_EN) begin
-        assign m_axis_tdest = m_axis_tdest_int_s[DEST_WIDTH-1:0];
+      if (TDEST_WIDTH > 0) begin
+        assign m_axis_tdest = m_axis_tdest_int_s[TDEST_WIDTH-1:0];
       end else begin
-        assign m_axis_tdest = {DEST_WIDTH{1'b0}};
+        assign m_axis_tdest = 2'b00;
       end
 
       assign m_axis_data = m_axis_data_int_s;

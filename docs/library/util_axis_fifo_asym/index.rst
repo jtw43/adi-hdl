@@ -132,7 +132,9 @@ blocks are calculated as follows:
    localparam A_ADDRESS_WIDTH = (REDUCED_FIFO) ? (ADDRESS_WIDTH-$clog2(RATIO)) : ADDRESS_WIDTH;
    localparam A_ALMOST_FULL_THRESHOLD = (REDUCED_FIFO) ? ((ALMOST_FULL_THRESHOLD+RATIO-1)/RATIO) : ALMOST_FULL_THRESHOLD;
    localparam A_ALMOST_EMPTY_THRESHOLD = (REDUCED_FIFO) ? ((ALMOST_EMPTY_THRESHOLD+RATIO-1)/RATIO) : ALMOST_EMPTY_THRESHOLD;
-   localparam A_USER_WIDTH = USER_WIDTH / RATIO;
+   localparam A_TUSER_WIDTH = (TUSER_WIDTH > 0) ? TUSER_WIDTH / RATIO : 1; // set to 1 when tuser width is 0 to avoid synthesis errors
+   localparam A_TID_WIDTH = (TID_WIDTH > 0) ? TID_WIDTH : 1; // set to 1 when tid width is 0 to avoid synthesis errors
+   localparam A_TDEST_WIDTH = (TDEST_WIDTH > 0) ? TDEST_WIDTH : 1; // set to 1 when tdest width is 0 to avoid synthesis errors
 
 FIFO Depth Calculation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -180,13 +182,25 @@ destination logic:
 User Signal Transfer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The core support both TUSER bits being relevant to the entire transfer mode
+TUSER bits per data byte mode. In the first case, TUSER_WIDTH can be set to any
+length. In the case of each data byte having a set of user bits, the calculation
+of the USER_WIDTH is done with the following formula for both interfaces:
+
+.. math::
+
+   TUSER_WIDTH = DATA_WIDTH / 8 * USER_BITS_PER_DATA_BYTE;
+
+Where:
+
+- **TUSER_WIDTH** - user width for one of the interfaces
+- **DATA_WIDTH** - data bus width in bits for that specific interface
+- **USER_BITS_PER_DATA_BYTE** - number of bits used for each data byte
+
 .. important::
 
-   In case of user signal transfer, the user signal width must be set as an
-   integer multiple of the width of the interface in bytes. In other words, all
-   bytes in the transfer have a fixed amount of user signals assigned to them.
-   This core does not support user signals that are transfer-based, meaning that
-   all user signals apply to all bytes.
+   For the TUSER_WIDTH IP parameter, the higher value **must** be used, and the
+   TUSER_WIDTH ratio must be equal to the DATA_WIDTH ratio!
 
 References
 --------------------------------------------------------------------------------
