@@ -14,12 +14,12 @@ source $ad_hdl_dir/projects/scripts/adi_board.tcl
 set TWOLANES [get_env_param TWOLANES 1]
 
 # if RESOLUTION parameter is not defined, by default it will use RESOLUTION=18
-# options: 18 bits (0) or 16 bits (1)
-set RESOLUTION_16_18N [get_env_param RESOLUTION_16_18N 0]
+# options: 18 bits (18) or 16 bits (16)
+set RESOLUTION [get_env_param RESOLUTION 18]
 
 adi_project cn0577_zed 0 [list \
   TWOLANES [get_env_param TWOLANES 1 ] \
-  RESOLUTION_16_18N [get_env_param RESOLUTION_16_18N 0 ] \
+  RESOLUTION [get_env_param RESOLUTION 0 ] \
 ]
 
 adi_project_files cn0577_zed [list \

@@ -4,16 +4,15 @@
 ###############################################################################
 
 set TWOLANES $ad_project_params(TWOLANES)
-set RESOLUTION_16_18N $ad_project_params(RESOLUTION_16_18N)
+set RESOLUTION $ad_project_params(RESOLUTION)
 
 puts "build parameter value TWOLANES = $TWOLANES"
-puts "build parameter value RESOLUTION_16_18N = $RESOLUTION_16_18N"
+puts "build parameter value RESOLUTION = $RESOLUTION"
 
-set ADC_RES [expr {$RESOLUTION_16_18N == 1 ? 16 : 18}]
-set OUT_RES [expr {$RESOLUTION_16_18N == 1 ? 16 : 32}]
-set CLK_GATE_WIDTH [expr {($TWOLANES == 0 && $RESOLUTION_16_18N == 0) ? 9 : \
-                          ($TWOLANES == 0 && $RESOLUTION_16_18N == 1) ? 8 : \
-                          ($TWOLANES == 1 && $RESOLUTION_16_18N == 0) ? 5 : \
+set OUT_RES [expr {$RESOLUTION == 16 ? 16 : 32}]
+set CLK_GATE_WIDTH [expr {($TWOLANES == 0 && $RESOLUTION == 18) ? 9 : \
+                          ($TWOLANES == 0 && $RESOLUTION == 16) ? 8 : \
+                          ($TWOLANES == 1 && $RESOLUTION == 18) ? 5 : \
                           4}]
 # ltc2387 i/o
 
@@ -31,7 +30,7 @@ create_bd_port -dir O clk_gate
 # adc peripheral
 
 ad_ip_instance axi_ltc2387 axi_ltc2387
-ad_ip_parameter axi_ltc2387 CONFIG.ADC_RES $ADC_RES
+ad_ip_parameter axi_ltc2387 CONFIG.ADC_RES $RESOLUTION
 ad_ip_parameter axi_ltc2387 CONFIG.OUT_RES $OUT_RES
 ad_ip_parameter axi_ltc2387 CONFIG.TWOLANES $TWOLANES
 ad_ip_parameter axi_ltc2387 CONFIG.ADC_INIT_DELAY 27

@@ -13,6 +13,6 @@ ad_ip_parameter rom_sys_0 CONFIG.PATH_TO_FILE "$mem_init_sys_file_path/mem_init_
 ad_ip_parameter rom_sys_0 CONFIG.ROM_ADDR_BITS 9
 
 set sys_cstring "TWOLANES=$ad_project_params(TWOLANES)\
-RESOLUTION_16_18N=$ad_project_params(RESOLUTION_16_18N)"
+RESOLUTION=$ad_project_params(RESOLUTION)"
 
 sysid_gen_sys_init_file $sys_cstring
