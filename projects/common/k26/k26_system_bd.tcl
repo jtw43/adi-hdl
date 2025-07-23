@@ -5,10 +5,6 @@
 
 set CACHE_COHERENCY true
 
-# create board design
-# set Kria SOM240_1 connector to KV260 evaluation carrier
-set_property board_connections {som240_1_connector xilinx.com:kv260_carrier:som240_1_connector:1.3} [current_project]
-
 # default ports
 
 create_bd_port -dir O -from 2 -to 0 spi0_csn
