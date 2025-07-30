@@ -22,6 +22,7 @@ M_DEPS += ../../../library/common/ad_iobuf.v
 M_DEPS += ../../../library/common/ad_3w_spi.v
 M_DEPS += ../../../library/axi_tdd/scripts/axi_tdd.tcl
 M_DEPS += ../../../library/util_cdc/cdc_constr.tcl
+M_DEPS += ../../../library/util_cdc/cdc_constr_async.tcl
 M_DEPS += ../../../library/corundum/scripts/corundum_vcu118_cfg.tcl
 M_DEPS += ../../../library/corundum/scripts/corundum.tcl
 
@@ -58,8 +59,8 @@ LIB_DEPS += util_pack/util_cpack2
 LIB_DEPS += util_pack/util_upack2
 LIB_DEPS += xilinx/axi_adxcvr
 LIB_DEPS += xilinx/util_adxcvr
-LIB_DEPS += corundum/corundum_core
-LIB_DEPS += corundum/ethernet
+# LIB_DEPS += corundum/corundum_core
+# LIB_DEPS += corundum/ethernet
 
 export BOARD := VCU118
 export CPU := MB

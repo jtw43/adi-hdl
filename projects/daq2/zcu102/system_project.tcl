@@ -36,19 +36,6 @@ adi_project_files daq2_zcu102 [list \
   "$ad_hdl_dir/library/common/ad_iobuf.v" \
   "$ad_hdl_dir/projects/common/zcu102/zcu102_system_constr.xdc" ]
 
-add_files -fileset constrs_1 -norecurse [list \
-  "$ad_hdl_dir/library/util_cdc/cdc_constr_async.tcl" \
-  "$ad_hdl_dir/library/util_cdc/cdc_constr.tcl" \
-  "timing_constr.tcl" \
-]
-
-# Avoid critical warning in OOC mode from the clock definitions
-# since at that stage the submodules are not stiched together yet
-if {$ADI_USE_OOC_SYNTHESIS == 1} {
-  set_property used_in_synthesis false [get_files $ad_hdl_dir/library/util_cdc/cdc_constr.tcl]
-  set_property used_in_synthesis false [get_files timing_constr.tcl]
-}
-
 adi_project_run daq2_zcu102
 
 ## To improve timing in the axi_ad9680_offload component

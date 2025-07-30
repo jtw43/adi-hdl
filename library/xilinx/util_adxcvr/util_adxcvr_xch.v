@@ -206,8 +206,8 @@ module util_adxcvr_xch #(
   reg     [11:0]  up_addr_int = 'd0;
   reg             up_wr_int = 'd0;
   reg     [15:0]  up_wdata_int = 'd0;
-  wire    [ 2:0]  rx_rate = 'd0;
-  wire    [ 2:0]  tx_rate = 'd0;
+  wire    [ 2:0]  rx_rate;
+  wire    [ 2:0]  tx_rate;
 
   // internal signals
 
