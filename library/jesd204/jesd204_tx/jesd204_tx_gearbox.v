@@ -32,7 +32,7 @@ module jesd204_tx_gearbox #(
                       OUT_DATA_PATH_WIDTH*8*NUM_LANES;
   localparam D_LOG2 = $clog2(DEPTH);
 
-  reg [MEM_W-1:0] mem [0:DEPTH-1];
+  (* ram_style = "block" *) reg [MEM_W-1:0] mem [0:DEPTH-1];
   reg [D_LOG2-1:0]  in_addr ='h00;
   reg [D_LOG2-1:0]  out_addr = 'b0;
   reg               mem_rd_valid = 'b0;

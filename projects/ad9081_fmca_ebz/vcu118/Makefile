@@ -21,8 +21,6 @@ M_DEPS += ../../../library/jesd204/scripts/jesd204.tcl
 M_DEPS += ../../../library/common/ad_iobuf.v
 M_DEPS += ../../../library/common/ad_3w_spi.v
 M_DEPS += ../../../library/axi_tdd/scripts/axi_tdd.tcl
-M_DEPS += ../../../library/util_cdc/cdc_constr.tcl
-M_DEPS += ../../../library/util_cdc/cdc_constr_async.tcl
 M_DEPS += ../../../library/corundum/scripts/corundum_vcu118_cfg.tcl
 M_DEPS += ../../../library/corundum/scripts/corundum.tcl
 
@@ -51,8 +49,6 @@ LIB_DEPS += jesd204/jesd204_tx
 LIB_DEPS += jesd204/jesd204_versal_gt_adapter_rx
 LIB_DEPS += jesd204/jesd204_versal_gt_adapter_tx
 LIB_DEPS += sysid_rom
-LIB_DEPS += util_adcfifo
-LIB_DEPS += util_dacfifo
 LIB_DEPS += util_do_ram
 LIB_DEPS += util_hbm
 LIB_DEPS += util_pack/util_cpack2
