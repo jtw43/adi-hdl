@@ -34,7 +34,7 @@
 // ***************************************************************************
 
 module axi_dmac_framelock #(
-  parameter DMA_AXI_ADDR_WIDTH = 32,
+  parameter DMA_AXI_ADDR_WIDTH = 64,
   parameter BYTES_PER_BEAT_WIDTH_DEST = 3,
   parameter BYTES_PER_BEAT_WIDTH_SRC = 3,
   parameter FRAMELOCK_MODE =  0, // 0 - MM writer ; 1 - MM reader
