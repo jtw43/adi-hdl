@@ -4,7 +4,8 @@ SPI Engine Instruction Set Specification
 ================================================================================
 
 The SPI Engine instruction set is a 16-bit instruction set of which 13-bits are
-currently allocated (bits 15,11,10 are always 0).
+currently allocated (bits 15 and 11 are always 0). Bit 10 is only being used by
+the :ref:`spi_engine write-configuration-instruction`.
 
 Instructions
 --------------------------------------------------------------------------------
@@ -165,6 +166,8 @@ prescaled).
      - Chip-select
      - The new chip-select configuration.
 
+.. _spi_engine write-configuration-instruction:
+
 Configuration Write Instruction
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -192,7 +195,7 @@ Configuration Write Instruction
      - 1
      - 0
      - rv
-     - rv
+     - rg
      - rg
      - rg
      - v
@@ -222,10 +225,11 @@ with a new value.
      - Register
      - Configuration register address:
       
-       - 2'b00 = :ref:`spi_engine prescaler-configuration-register`.
-       - 2'b01 = :ref:`spi_engine spi-configuration-register`.
-       - 2'b10 = :ref:`spi_engine dynamic-transfer-length-register`.
-       - 2'b11 = :ref:`spi_engine spi-lane-mask-register`.
+       - 3'b000 = :ref:`spi_engine prescaler-configuration-register`.
+       - 3'b001 = :ref:`spi_engine spi-configuration-register`.
+       - 3'b010 = :ref:`spi_engine dynamic-transfer-length-register`.
+       - 3'b011 = :ref:`spi_engine sdi-lane-mask-register`.
+       - 3'b100 = :ref:`spi_engine sdo-lane-mask-register`.
    * - v
      - Value
      - New value for the configuration register.
@@ -471,15 +475,14 @@ bus behavior.
        - When 1, data is sampled on the trailing edge and updated on the
          leading edge.
 
+.. _spi_engine sdi-lane-mask-register:
 
-.. _spi_engine spi-lane-mask-register:
-
-SPI Lane Mask Register
+SDI Lane Mask Register
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This register configures the mask that defines which lanes are active
-(active-high). The user must define a mask that contains up to ``NUM_OF_SDI``
-lanes (the number of activated lanes cannot be bigger than the numer of lanes).
+This register configures the SDI mask that defines which lanes are active
+(active-high). The user must define a mask that contains up to ``NUM_OF_SDIO``
+lanes (the number of activated lanes cannot be bigger than the number of lanes).
 For now, it is possible to have up to 8 lanes due to the instruction size.
 
 .. list-table::
@@ -490,7 +493,29 @@ For now, it is possible to have up to 8 lanes due to the instruction size.
      - Name
      - Description
    * - [7:0]
-     - Lane mask
+     - SDI lane mask
+     - Only bits set to 1 have their respective lane active.
+
+
+.. _spi_engine sdo-lane-mask-register:
+
+SDO Lane Mask Register
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This register configures the SDO mask that defines which lanes are active
+(active-high). The user must define a mask that contains up to ``NUM_OF_SDIO``
+lanes (the number of activated lanes cannot be bigger than the number of lanes).
+For now, it is possible to have up to 8 lanes due to the instruction size.
+
+.. list-table::
+   :widths: 10 15 50
+   :header-rows: 1
+
+   * - Bits
+     - Name
+     - Description
+   * - [7:0]
+     - SDO lane mask
      - Only bits set to 1 have their respective lane active.
 
 .. _spi_engine prescaler-configuration-register:

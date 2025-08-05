@@ -40,8 +40,8 @@ Configuration Parameters
 
    * - DATA_WIDTH
      - Data width of the parallel SDI/SDO data interfaces.
-   * - NUM_OF_SDI
-     - Number of SDI lines on the physical SPI interface.
+   * - NUM_OF_SDIO
+     - Number of SDI/SDO lines on the physical SPI interface.
 
 
 Signal and Interface Pins

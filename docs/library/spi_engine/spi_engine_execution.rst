@@ -40,8 +40,8 @@ Configuration Parameters
    * - DATA_WIDTH
      - Data width of the parallel data stream. Will define the transaction's
        granularity. Supported values: 8/16/24/32
-   * - NUM_OF_SDI
-     - Number of multiple SDI lines, (min: 1, max: 8)
+   * - NUM_OF_SDIO
+     - Number of multiple SDI/SDO lines, (min: 1, max: 8)
 
 Signal and Interface Pins
 --------------------------------------------------------------------------------
