@@ -320,11 +320,13 @@ proc adi_project_create {project_name mode parameter_list device {board "not-app
       "timing_constr.tcl" \
     ]
     set_property used_in_synthesis false [get_files timing_constr.tcl]
+    set_property processing_order late [get_files timing_constr.tcl]
   } else {
     add_files -fileset constrs_1 -norecurse [list \
       "$ad_hdl_dir/library/xilinx/common/timing_constr.tcl" \
     ]
     set_property used_in_synthesis false [get_files $ad_hdl_dir/library/xilinx/common/timing_constr.tcl]
+    set_property processing_order late [get_files $ad_hdl_dir/library/xilinx/common/timing_constr.tcl]
   }
 
 }
