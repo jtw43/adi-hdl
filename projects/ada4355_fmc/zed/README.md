@@ -16,15 +16,15 @@ cd projects/ada4355_fmc/zed
 make
 ```
 
-This project supports two evaluation boards, which are differentiated by how the frame clock signals are distributed.
+This project supports two pinout variants, which are differentiated by how the frame clock signals are distributed.
 
-For the older evaluation board, the XDC constraints are not optimized for ISERDES, as the frame clock signals are located in a different I/O bank from the other related signals. To address this, a BUFMRCE buffer is used to distribute the frame clock to all ISERDES instances.
+For one pinout version, the XDC constraints are not optimized for ISERDES, as the frame clock signals are located in a different I/O bank from the other related signals. To address this, a BUFMRCE buffer is used to distribute the frame clock to all ISERDES instances.
 
 The overwritable parameters from the environment:
 
 - BUFMRCE_EN - Specifies the evaluation board type
-  - 0 - newer evaluation board, with optimized constraints (default)
-  - 1 - older evaluation board, with non-optimized constraints
+  - 0 - pinout with optimized constraints (default)
+  - 1 - pinout with non-optimized constraints
 
 ### Example configurations
 
