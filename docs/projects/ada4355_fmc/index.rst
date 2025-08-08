@@ -69,23 +69,23 @@ The data path and clock domains are depicted in the below diagram:
 Configuration modes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The BUFMRCE_EN configuration parameter defines the type of evaluation board
-used, which are differentiated by how the frame clock signals are distributed.
-For the older evaluation board, the XDC constraints are not optimized for
-ISERDES, as the frame clock signals are located in a different I/O bank from
-the other related signals. To address this, a BUFMRCE buffer is used to
-distribute the frame clock to all ISERDES instances.
+The BUFMRCE_EN configuration parameter defines the pinout used which is
+differentiated by how the frame clock signals are distributed.
+For one pinout version, the XDC constraints are not optimized for ISERDES,
+as the frame clock signals are located in a different I/O bank from the other
+related signals. To address this, a BUFMRCE buffer is used to distribute the
+frame clock to all ISERDES instances.
 
-By default it is set to 0. Depending on the type of evaluation board, some
-hardware modifications need to be done on the board and/or ``make`` command:
+By default it is set to 0. Depending on the pinout, some hardware modifications
+need to be done on the board and/or ``make`` command:
 
-In case of the Eval-Board with optimized xdc:
+In case of the pinout with optimized xdc:
 
 .. shell:: bash
 
    $make BUFMRCE_EN=0
 
-In case of the Eval-Board with non optimized xdc:
+In case of the pinout with non optimized xdc:
 
 .. shell:: bash
 

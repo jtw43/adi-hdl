@@ -49,7 +49,7 @@ Configuration Parameters
    * - FPGA_TECHNOLOGY
      - Used to select between FPGA devices, auto set in project.
    * - BUFMRCE_EN
-     - Used to select between evaluation boards that are differentiated
+     - Used to select between pinouts that are differentiated
        by how the frame clock signals are distributed.
 
 Interface
