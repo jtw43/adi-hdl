@@ -57,7 +57,7 @@ set p_prcfg_status ""
 # system_top module)
 #
 # Supported carrier names are: ac701, vcu118, kcu105, zed, microzed, zc702,
-# zc706, mitx405, zcu102.
+# zc706, mitx405, zcu102, zcu106.
 #
 proc adi_project {project_name {mode 0} {parameter_list {}} } {
 
@@ -136,6 +136,10 @@ proc adi_project {project_name {mode 0} {parameter_list {}} } {
   if [regexp "_k26" $project_name] {
     set device "xck26-sfvc784-2LVI-i"
     set board [lindex [lsearch -all -inline [get_board_parts] *k26*] end]
+  }
+  if [regexp "_zcu106" $project_name] {
+    set device "xczu7ev-ffvc1156-2-e"
+      set board [lindex [lsearch -all -inline [get_board_parts] *zcu106*] end]
   }
 
   adi_project_create $project_name $mode $parameter_list $device $board
